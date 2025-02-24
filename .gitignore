@@ -41,6 +41,7 @@ share/python-wheels/
 MANIFEST
 .history
 /venv
+/.venv
 
 # Input and Output
 /input/
