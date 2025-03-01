@@ -130,6 +130,9 @@ class Translator(str, Enum):
     mbart50 = "mbart50"
     qwen2 = "qwen2"
     qwen2_big = "qwen2_big"
+    gemini_pro = 'gemini-2.0-pro-exp-0205'
+    gemini_flash = 'gemini-2.0-flash-exp'
+    gemini_thinking = 'gemini-2.0-flash-thinking-exp-01-21'
 
     def __str__(self):
         return self.name
@@ -236,7 +239,7 @@ class TranslatorConfig(BaseModel):
                 self._translator_gen = trans
             elif self.translator_chain is not None:
                 trans = translator_chain(self.translator_chain)
-                trans.target_lang = trans.langs[0]
+                trans.target_lang = trans.langs[-1]
                 self._translator_gen = trans
             else:
                 self._translator_gen = TranslatorChain(f'{str(self.translator)}:{self.target_lang}')

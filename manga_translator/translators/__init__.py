@@ -22,6 +22,7 @@ from .sakura import SakuraTranslator
 from .qwen2 import Qwen2Translator, Qwen2BigTranslator
 from .groq import GroqTranslator
 from .ollama import OllamaTranslator
+from .gemini import GeminiTranslator
 from ..config import Translator, TranslatorConfig, TranslatorChain
 from ..utils import Context
 
@@ -51,18 +52,22 @@ TRANSLATORS = {
     Translator.original: OriginalTranslator,
     Translator.sakura: SakuraTranslator,
     Translator.deepseek: DeepseekTranslator,
-    Translator.groq:GroqTranslator,
+    Translator.groq: GroqTranslator,
     Translator.ollama: OllamaTranslator,
+    Translator.gemini_pro: lambda *args, **kwargs: GeminiTranslator(model_name='gemini-2.0-pro-exp-0205', *args, **kwargs),
+    Translator.gemini_flash: lambda *args, **kwargs: GeminiTranslator(model_name='gemini-2.0-flash-exp', *args, **kwargs),
+    Translator.gemini_thinking: lambda *args, **kwargs: GeminiTranslator(model_name='gemini-2.0-flash-thinking-exp-01-21', *args, **kwargs),
     **OFFLINE_TRANSLATORS,
 }
+
 translator_cache = {}
 
 def get_translator(key: Translator, *args, **kwargs) -> CommonTranslator:
     if key not in TRANSLATORS:
         raise ValueError(f'Could not find translator for: "{key}". Choose from the following: %s' % ','.join(TRANSLATORS))
-    if not translator_cache.get(key):
-        translator = TRANSLATORS[key]
-        translator_cache[key] = translator(*args, **kwargs)
+    if key not in translator_cache:
+        translator_factory = TRANSLATORS[key]
+        translator_cache[key] = translator_factory(*args, **kwargs)
     return translator_cache[key]
 
 prepare_selective_translator(get_translator)
@@ -82,20 +87,17 @@ async def dispatch(chain: TranslatorChain, queries: List[str], translator_config
     if chain.target_lang is not None:
         text_lang = ISO_639_1_TO_VALID_LANGUAGES.get(langid.classify('\n'.join(queries))[0])
         translator = None
-        flag=0
-        for key, lang in chain.chain:           
-            #if text_lang == lang:
-                #translator = get_translator(key)
-            #if translator is None:
-            translator = get_translator(chain.translators[flag])
-            if isinstance(translator, OfflineTranslator):
-                await translator.load('auto', chain.langs[flag], device)
-                pass
-            if translator_config:
-                translator.parse_args(translator_config)
-            queries = await translator.translate('auto', chain.langs[flag], queries, use_mtpe)
-            await translator.unload(device)
-            flag+=1
+        for key, lang in chain.chain:
+            if text_lang == lang:
+                translator = get_translator(key)
+                break
+        if translator is None:
+            translator = get_translator(chain.langs[0])
+        if isinstance(translator, OfflineTranslator):
+            await translator.load('auto', chain.target_lang, device)
+        if translator_config:
+            translator.parse_args(translator_config)
+        queries = await translator.translate('auto', chain.target_lang, queries, use_mtpe)
         return queries
     if args is not None:
         args['translations'] = {}
