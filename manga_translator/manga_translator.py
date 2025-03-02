@@ -183,7 +183,9 @@ class MangaTranslator:
             await prepare_detection(config.detector.detector)
             await prepare_ocr(config.ocr.ocr, self.device)
             await prepare_inpainting(config.inpainter.inpainter, self.device)
+            logger.info('Loading translation models')
             await prepare_translation(config.translator.translator_gen)
+            logger.info('Finished translation models')
             if config.colorizer.colorizer != Colorizer.none:
                 await prepare_colorization(config.colorizer.colorizer)
 
@@ -191,6 +193,7 @@ class MangaTranslator:
         return await self._translate(config, ctx)
 
     async def _translate(self, config: Config, ctx: Context) -> Context:
+        logger.info('_translate')
         # Start the background cleanup job once if not already started.
         if self._detector_cleanup_task is None:
             self._detector_cleanup_task = asyncio.create_task(self._detector_cleanup_job())
@@ -740,6 +743,7 @@ class MangaTranslator:
         self._progress_hooks.append(ph)
 
     async def _report_progress(self, state: str, finished: bool = False):
+        logger.info(f"Progress: {state}")
         for ph in self._progress_hooks:
             await ph(state, finished)
 
