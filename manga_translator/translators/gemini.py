@@ -45,7 +45,10 @@ class GeminiTranslator(ConfigGPT, CommonTranslator):
         safety_settings = []
         for category in genai.types.HarmCategory:
             safety_settings.append(
-                {"category": category, "threshold": genai.types.HarmBlockThreshold.BLOCK_NONE}
+                {
+                    "category": category,
+                    "threshold": genai.types.HarmBlockThreshold.BLOCK_NONE,
+                }
             )
         return safety_settings
 
@@ -55,6 +58,18 @@ class GeminiTranslator(ConfigGPT, CommonTranslator):
             temperature=self.temperature,
             top_p=self.top_p,
             max_output_tokens=self._MAX_TOKENS,
+        )
+
+    def get_model(self, to_lang: str, check_google_key=True):
+        api_key = self.round_robin_gemini_api_key(check_google_key)
+        genai.configure(api_key=api_key)
+        self.generation_config = self._configure_generation_config()
+        self.safety_settings = self._configure_safety_settings()
+        return genai.GenerativeModel(
+            model_name=self.model_name,
+            generation_config=self.generation_config,
+            safety_settings=self.safety_settings,
+            system_instruction=self.chat_system_template.format(to_lang=to_lang),
         )
 
     def __init__(
@@ -73,7 +88,7 @@ class GeminiTranslator(ConfigGPT, CommonTranslator):
         genai.configure(api_key=api_key)
         self.generation_config = self._configure_generation_config()
         self.safety_settings = self._configure_safety_settings()
-        self.model = genai.GenerativeModel(
+        model = genai.GenerativeModel(
             model_name=model_name,
             generation_config=self.generation_config,
             safety_settings=self.safety_settings,
@@ -140,31 +155,42 @@ class GeminiTranslator(ConfigGPT, CommonTranslator):
 
     async def _request_translation(self, to_lang: str, prompt: str) -> str:
         # Build system instruction
-        system_instruction = self.chat_system_template.format(to_lang=to_lang)
-        
+
         # Build messages using dictionaries instead of Content objects
         messages = []
         if to_lang in self.chat_sample:
-            messages.append({"role": "user", "parts": [{"text": self.chat_sample[to_lang][0]}]})
-            messages.append({"role": "model", "parts": [{"text": self.chat_sample[to_lang][1]}]})
+            messages.append(
+                {"role": "user", "parts": [{"text": self.chat_sample[to_lang][0]}]}
+            )
+            messages.append(
+                {"role": "model", "parts": [{"text": self.chat_sample[to_lang][1]}]}
+            )
         messages.append({"role": "user", "parts": [{"text": prompt}]})
 
-        self.logger.debug("-- Gemini system instruction --\n" + system_instruction + "\n")
         self.logger.debug(
-            "-- Gemini messages --\n" +
-            "\n".join(f"{msg['role'].capitalize()}: {msg['parts'][0]['text']}" for msg in messages) + "\n"
+            "-- Gemini system instruction --\n" + system_instruction + "\n"
         )
-        
+        self.logger.debug(
+            "-- Gemini messages --\n"
+            + "\n".join(
+                f"{msg['role'].capitalize()}: {msg['parts'][0]['text']}"
+                for msg in messages
+            )
+            + "\n"
+        )
+
         try:
-            response = self.model.generate_content(
+            model = self.get_model(to_lang)
+            response = model.generate_content(
                 contents=messages,
                 generation_config=self.generation_config,
                 safety_settings=self.safety_settings,
-                system_instruction=system_instruction,
                 stream=False,
             )
             response_text = response.text
-            self.logger.debug("\n-- Gemini Response --\n" + response_text + "\n------------------\n")
+            self.logger.debug(
+                "\n-- Gemini Response --\n" + response_text + "\n------------------\n"
+            )
 
             if not response.candidates:
                 raise ValueError("Empty response from Gemini API")
