@@ -65,6 +65,9 @@ class GeminiTranslator(ConfigGPT, CommonTranslator):
         genai.configure(api_key=api_key)
         self.generation_config = self._configure_generation_config()
         self.safety_settings = self._configure_safety_settings()
+        self.logger.info(
+            f"Creating model with name {self.model_name} and to_lang {to_lang}, api_key {api_key}, generation_config {self.generation_config}, safety_settings {self.safety_settings}"
+        )
         return genai.GenerativeModel(
             model_name=self.model_name,
             generation_config=self.generation_config,
@@ -169,9 +172,6 @@ class GeminiTranslator(ConfigGPT, CommonTranslator):
 
         try:
             model = self.get_model(to_lang)
-            logger.debug(
-                f"system instruction: {self.chat_system_template.format(to_lang=to_lang)}\n lets generate now!!"
-            )
             logger.info(
                 {
                     "contents": messages,
