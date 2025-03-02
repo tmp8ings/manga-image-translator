@@ -167,20 +167,12 @@ class GeminiTranslator(ConfigGPT, CommonTranslator):
             )
         messages.append({"role": "user", "parts": [{"text": prompt}]})
 
-        self.logger.debug(
-            "-- Gemini system instruction --\n" + system_instruction + "\n"
-        )
-        self.logger.debug(
-            "-- Gemini messages --\n"
-            + "\n".join(
-                f"{msg['role'].capitalize()}: {msg['parts'][0]['text']}"
-                for msg in messages
-            )
-            + "\n"
-        )
-
         try:
             model = self.get_model(to_lang)
+            self.logger.debug(
+                "\n-- Gemini Request --\n" + str(messages) + "\n------------------\n"
+            )
+            self.logger.debug(self.chat_system_template.format(to_lang=to_lang))
             response = model.generate_content(
                 contents=messages,
                 generation_config=self.generation_config,
