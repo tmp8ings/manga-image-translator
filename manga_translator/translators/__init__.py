@@ -1,3 +1,4 @@
+import logging
 from typing import Optional
 
 import py3langid as langid
@@ -62,7 +63,11 @@ TRANSLATORS = {
 
 translator_cache = {}
 
+logger = logging.getLogger("manga_translator")
+
 def get_translator(key: Translator, *args, **kwargs) -> CommonTranslator:
+    logger.info(key)
+    logger.info(TRANSLATORS)
     if key not in TRANSLATORS:
         raise ValueError(f'Could not find translator for: "{key}". Choose from the following: %s' % ','.join(TRANSLATORS))
     if key not in translator_cache:
