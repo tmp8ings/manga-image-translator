@@ -169,10 +169,17 @@ class GeminiTranslator(ConfigGPT, CommonTranslator):
 
         try:
             model = self.get_model(to_lang)
-            self.logger.debug(
-                "\n-- Gemini Request --\n" + str(messages) + "\n------------------\n"
+            logger.debug(
+                f"system instruction: {self.chat_system_template.format(to_lang=to_lang)}\n lets generate now!!"
             )
-            self.logger.debug(self.chat_system_template.format(to_lang=to_lang))
+            logger.info(
+                {
+                    "contents": messages,
+                    "generation_config": self.generation_config,
+                    "safety_settings": self.safety_settings,
+                    "stream": False,
+                }
+            )
             response = model.generate_content(
                 contents=messages,
                 generation_config=self.generation_config,
@@ -180,7 +187,7 @@ class GeminiTranslator(ConfigGPT, CommonTranslator):
                 stream=False,
             )
             response_text = response.text
-            self.logger.debug(
+            logger.debug(
                 "\n-- Gemini Response --\n" + response_text + "\n------------------\n"
             )
 
@@ -189,7 +196,7 @@ class GeminiTranslator(ConfigGPT, CommonTranslator):
             return response_text
 
         except genai.types.BlockedPromptException as e:
-            self.logger.error(f"Blocked prompt error: {e}")
+            logger.error(f"Blocked prompt error: {e}")
             raise
         except google.api_core.exceptions.RetryError as e:
             self.logger.error(f"Gemini rate limit exceeded or API error: {e}")
