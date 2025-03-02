@@ -117,9 +117,7 @@ async def dispatch(
         if config.render.alignment:
             region._alignment = config.render.alignment
         if config.render.direction:
-            logger.info(f"region._direction - before: {region._direction}, {str(region._direction)}")
             region._direction = config.render.direction
-            logger.info(f"region._direction - after: {region._direction}, {str(region._direction)}")
         if render_mask is not None:
             # set render_mask to 1 for the region that is inside dst_points
             cv2.fillConvexPoly(render_mask, dst_points.astype(np.int32), 1)

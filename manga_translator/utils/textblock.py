@@ -379,7 +379,6 @@ class TextBlock(object):
     @property
     def direction(self):
         """Render direction determined through used language or aspect ratio."""
-        logger.info(f"in direction method: {self._direction}, {type(self._direction)}")
         if self._direction not in ('h', 'v', 'hr', 'vr'):
             d = LANGUAGE_ORIENTATION_PRESETS.get(self.target_lang)
             if d in ('h', 'v', 'hr', 'vr'):
