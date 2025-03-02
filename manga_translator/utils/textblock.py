@@ -117,6 +117,9 @@ class TextBlock(object):
         self.shadow_strength = shadow_strength
         self.shadow_color = shadow_color
         self.shadow_offset = shadow_offset
+    
+    def __str__(self):
+        return f"TextBlock(text: {self.text[:3]}, angle: {self.angle}, direction: {self.direction}, alignment: {self.alignment})"
 
     @cached_property
     def xyxy(self):
