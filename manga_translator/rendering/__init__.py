@@ -138,7 +138,7 @@ def render(
     r_orig = np.mean(norm_h / norm_v)
 
     logger.debug(f'norm_h {norm_h}, norm_v {norm_v}, r_orig {r_orig}, region {region}')
-    if True or region.horizontal:
+    if region.horizontal:
         temp_box = text_render.put_text_horizontal(
             region.font_size,
             region.get_translation_for_rendering(),
