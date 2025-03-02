@@ -130,7 +130,7 @@ class Translator(str, Enum):
     mbart50 = "mbart50"
     qwen2 = "qwen2"
     qwen2_big = "qwen2_big"
-    gemini_pro = 'gemini-2.0-pro-exp-0205'
+    gemini_pro = 'gemini-2.0-pro-exp-02-05'
     gemini_flash = 'gemini-2.0-flash-exp'
     gemini_thinking = 'gemini-2.0-flash-thinking-exp-01-21'
 

@@ -55,7 +55,7 @@ TRANSLATORS = {
     Translator.deepseek: DeepseekTranslator,
     Translator.groq: GroqTranslator,
     Translator.ollama: OllamaTranslator,
-    Translator.gemini_pro: lambda *args, **kwargs: GeminiTranslator(model_name='gemini-2.0-pro-exp-0205', *args, **kwargs),
+    Translator.gemini_pro: lambda *args, **kwargs: GeminiTranslator(model_name='gemini-2.0-pro-exp-02-05', *args, **kwargs),
     Translator.gemini_flash: lambda *args, **kwargs: GeminiTranslator(model_name='gemini-2.0-flash-exp', *args, **kwargs),
     Translator.gemini_thinking: lambda *args, **kwargs: GeminiTranslator(model_name='gemini-2.0-flash-thinking-exp-01-21', *args, **kwargs),
     **OFFLINE_TRANSLATORS,
