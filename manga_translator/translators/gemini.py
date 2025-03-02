@@ -139,41 +139,32 @@ class GeminiTranslator(ConfigGPT, CommonTranslator):
         return translations
 
     async def _request_translation(self, to_lang: str, prompt: str) -> str:
-        messages = [
-            {
-                "role": "system",
-                "content": self.chat_system_template.format(to_lang=to_lang),
-            }
-        ]
+        # Build system instruction
+        system_instruction = self.chat_system_template.format(to_lang=to_lang)
+        
+        # Build messages using dictionaries instead of Content objects
+        messages = []
         if to_lang in self.chat_sample:
-            messages.append({"role": "user", "content": self.chat_sample[to_lang][0]})
-            messages.append(
-                {"role": "assistant", "content": self.chat_sample[to_lang][1]}
-            )
-        messages.append({"role": "user", "content": prompt})
+            messages.append({"role": "user", "parts": [{"text": self.chat_sample[to_lang][0]}]})
+            messages.append({"role": "model", "parts": [{"text": self.chat_sample[to_lang][1]}]})
+        messages.append({"role": "user", "parts": [{"text": prompt}]})
+
+        self.logger.debug("-- Gemini system instruction --\n" + system_instruction + "\n")
         self.logger.debug(
-            "-- Gemini prompt --\n"
-            + "\n".join(
-                f"{msg['role'].capitalize()}:\n {msg['content']}" for msg in messages
-            )
-            + "\n"
+            "-- Gemini messages --\n" +
+            "\n".join(f"{msg['role'].capitalize()}: {msg['parts'][0]['text']}" for msg in messages) + "\n"
         )
+        
         try:
-            model_messages = [
-                genai.types.content.Content(parts=[msg["content"]], role=msg["role"])
-                for msg in messages
-            ]
-            logger.info(model_messages)
             response = self.model.generate_content(
-                contents=model_messages,
+                contents=messages,
                 generation_config=self.generation_config,
                 safety_settings=self.safety_settings,
+                system_instruction=system_instruction,
                 stream=False,
             )
             response_text = response.text
-            self.logger.debug(
-                "\n-- Gemini Response --\n" + response_text + "\n------------------\n"
-            )
+            self.logger.debug("\n-- Gemini Response --\n" + response_text + "\n------------------\n")
 
             if not response.candidates:
                 raise ValueError("Empty response from Gemini API")
