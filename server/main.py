@@ -36,35 +36,34 @@ app = FastAPI()
 nonce = None
 
 # Add middleware to log requests and responses
-@app.middleware("http")
-async def log_requests(request: Request, call_next):
-    try:
-        response = await call_next(request)
-        if response.status_code >= 400:
-            logger.error(f"HTTP Error {response.status_code}: {request.method} {request.url.path}")
-        # else:
-        #     logger.info(f"HTTP {response.status_code}: {request.method} {request.url.path}")
-        return response
-    except Exception as e:
-        logger.error(f"Unhandled exception in {request.method} {request.url.path}: {str(e)}")
-        logger.error(traceback.format_exc())
-        raise e
+# @app.middleware("http")
+# async def log_requests(request: Request, call_next):
+#     try:
+#         response = await call_next(request)
+#         if response.status_code >= 400:
+#             logger.error(f"HTTP Error {response.status_code}: {request.method} {request.url.path}")
+#         # else:
+#         #     logger.info(f"HTTP {response.status_code}: {request.method} {request.url.path}")
+#         return response
+#     except Exception as e:
+#         logger.error(f"Unhandled exception in {request.method} {request.url.path}: {str(e)}")
+#         logger.error(traceback.format_exc())
+#         raise e
 
 # Add exception handlers for different types of errors
-@app.exception_handler(StarletteHTTPException)
-async def http_exception_handler(request: Request, exc: StarletteHTTPException):
-    logger.error(f"HTTP {exc.status_code}: {exc.detail} at {request.method} {request.url.path}")
-    return {"detail": exc.detail}, exc.status_code
+# @app.exception_handler(StarletteHTTPException)
+# async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+#     logger.error(f"HTTP {exc.status_code}: {exc.detail} at {request.method} {request.url.path}")
+#     return {"detail": exc.detail}, exc.status_code
 
-@app.exception_handler(RequestValidationError)
-async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    logger.error(f"Validation error at {request.method} {request.url.path}: {str(exc)}")
-    return {"detail": str(exc)}, 422
+# @app.exception_handler(RequestValidationError)
+# async def validation_exception_handler(request: Request, exc: RequestValidationError):
+#     logger.error(f"Validation error at {request.method} {request.url.path}: {str(exc)}")
+#     return {"detail": str(exc)}, 422
 
 @app.exception_handler(Exception)
 async def general_exception_handler(request: Request, exc: Exception):
-    logger.error(f"Unhandled exception at {request.method} {request.url.path}: {str(exc)}")
-    logger.error(traceback.format_exc())
+    logger.error(f"Unhandled exception at {request.method} {request.url.path}: {str(exc)}", exc_info=exc)
     return {"detail": "Internal server error"}, 500
 
 app.add_middleware(
