@@ -157,9 +157,11 @@ class GeminiTranslator(ConfigGPT, CommonTranslator):
                 genai.types.content.Content(parts=[msg["content"]], role=msg["role"])
                 for msg in messages
             ]
+            print(model_messages)
             response = self.model.generate_content(
                 contents=model_messages,
                 generation_config=self.generation_config,
+                safety_settings=self.safety_settings,
                 stream=False,
             )
             response_text = response.text

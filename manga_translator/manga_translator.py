@@ -486,12 +486,14 @@ class MangaTranslator:
             with open(self._result_path(f"{input_filename}_translations.txt"), "r") as f:
                     translated_sentences = json.load(f)
         else:
+            print(f"original texts: {[region.text for region in ctx.text_regions]}")
             translated_sentences = \
                 await dispatch_translation(config.translator.translator_gen,
                                            [region.text for region in ctx.text_regions],
                                            config.translator,
                                            self.use_mtpe,
                                            ctx, 'cpu' if self._gpu_limited_memory else self.device)
+            print(f"translated_sentences: {translated_sentences}")
 
             # Save translation if args.save_text is set and quit
             if self.save_text:
