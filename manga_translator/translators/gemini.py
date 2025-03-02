@@ -169,7 +169,7 @@ class GeminiTranslator(ConfigGPT, CommonTranslator):
 
         try:
             model = self.get_model(to_lang)
-            logger.info(
+            self.logger.info(
                 {
                     "contents": messages,
                     "generation_config": self.generation_config,
@@ -184,7 +184,7 @@ class GeminiTranslator(ConfigGPT, CommonTranslator):
                 stream=False,
             )
             response_text = response.text
-            logger.debug(
+            self.logger.debug(
                 "\n-- Gemini Response --\n" + response_text + "\n------------------\n"
             )
 
