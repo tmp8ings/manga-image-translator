@@ -1,6 +1,6 @@
 import argparse
 import re
-from enum import Enum
+from enum import Enum, StrEnum
 
 from typing import Optional
 
@@ -61,13 +61,13 @@ class Renderer(str, Enum):
     manga2Eng = "manga2eng"
     none = "none"
 
-class Alignment(str, Enum):
+class Alignment(StrEnum):
     auto = "auto"
     left = "left"
     center = "center"
     right = "right"
 
-class Direction(str, Enum):
+class Direction(StrEnum):
     auto = "auto"
     h = "horizontal"
     v = "vertical"
