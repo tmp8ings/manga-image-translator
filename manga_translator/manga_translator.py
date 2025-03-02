@@ -313,7 +313,7 @@ class MangaTranslator:
         await self._report_progress("translating")
         try:
             ctx.text_regions = await self._run_text_translation(config, ctx)
-            logger.info(ctx.text_regions)
+            logger.info(f"Translated text regions: {ctx.text_regions}")
         except Exception as e:
             logger.error(f"Error during translation: {str(e)}", exc_info=True)
             raise e
