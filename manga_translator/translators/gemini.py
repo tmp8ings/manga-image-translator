@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import time
 import re
 from typing import List
@@ -9,7 +10,8 @@ from .keys import GOOGLE_API_KEY, GOOGLE_HTTP_PROXY
 
 import google.generativeai as genai
 
-logger = logging.getLogger('manga_translator')
+logger = logging.getLogger("manga_translator")
+
 
 class GeminiTranslator(ConfigGPT, CommonTranslator):
     _LANGUAGE_CODE_MAP = VALID_LANGUAGES
