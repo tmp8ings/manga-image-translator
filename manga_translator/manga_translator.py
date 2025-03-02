@@ -711,6 +711,7 @@ class MangaTranslator:
             if config.render.alignment:
                 region._alignment = config.render.alignment
             if config.render.direction:
+                logger.info(f"direction: {config.render.direction}")
                 region._direction = config.render.direction
 
         # Punctuation correction logic. for translators often incorrectly change quotation marks from the source language to those commonly used in the target language.
