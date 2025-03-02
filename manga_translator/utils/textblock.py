@@ -1,4 +1,5 @@
 import cv2
+from manga_translator.config import Direction
 from manga_translator.utils.log import get_logger
 import numpy as np
 from typing import List, Tuple
@@ -378,11 +379,16 @@ class TextBlock(object):
     @property
     def direction(self):
         """Render direction determined through used language or aspect ratio."""
-        logger.info(f"in direction method: {self._direction}")
+        logger.info(f"in direction method: {self._direction}, {type(self._direction)}")
         if self._direction not in ('h', 'v', 'hr', 'vr'):
             d = LANGUAGE_ORIENTATION_PRESETS.get(self.target_lang)
             if d in ('h', 'v', 'hr', 'vr'):
                 return d
+
+            if self._direction == Direction.h:
+                return 'h'
+            elif self._direction == Direction.v:
+                return 'v'
 
             if self.aspect_ratio < 1:
                 return 'v'
