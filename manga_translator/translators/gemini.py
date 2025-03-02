@@ -4,6 +4,8 @@ import time
 import re
 from typing import List
 
+from manga_translator.config import TranslatorConfig
+
 from .config_gpt import ConfigGPT
 from .common import CommonTranslator, MissingAPIKeyException, VALID_LANGUAGES
 from .keys import GOOGLE_API_KEY, GOOGLE_HTTP_PROXY
@@ -86,7 +88,7 @@ class GeminiTranslator(ConfigGPT, CommonTranslator):
         self._last_request_ts = 0
         self.model_name = model_name  # add model name at instance
 
-    def parse_args(self, args: CommonTranslator):
+    def parse_args(self, args: TranslatorConfig):
         self.config = args.gemini_config
 
     def _assemble_prompts(self, from_lang: str, to_lang: str, queries: List[str]):

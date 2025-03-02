@@ -252,6 +252,10 @@ class TranslatorConfig(BaseModel):
             self._gpt_config = OmegaConf.load(self.gpt_config)
         return self._gpt_config
 
+    @property
+    def gemini_config(self):
+        return None
+
 
 class DetectorConfig(BaseModel):
     """"""
