@@ -712,9 +712,7 @@ class MangaTranslator:
             if config.render.alignment:
                 region._alignment = config.render.alignment
             if config.render.direction:
-                logger.info(f"region._direction - before: {region._direction}, {str(region._direction)}")
                 region._direction = config.render.direction
-                logger.info(f"region._direction - after: {region._direction}, {str(region._direction)}")
 
         # Punctuation correction logic. for translators often incorrectly change quotation marks from the source language to those commonly used in the target language.
         check_items = [
@@ -1004,6 +1002,7 @@ class MangaTranslator:
             )
         else:
             output = await dispatch_rendering(
+                config,
                 ctx.img_inpainted,
                 ctx.text_regions,
                 self.font_path,

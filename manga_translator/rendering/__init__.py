@@ -1,5 +1,6 @@
 import os
 import cv2
+from manga_translator.config import Config
 import numpy as np
 from typing import List
 from shapely import affinity
@@ -90,6 +91,7 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List[TextBlock], 
     return dst_points_list
 
 async def dispatch(
+    config: Config,
     img: np.ndarray,
     text_regions: List[TextBlock],
     font_path: str = '',
@@ -99,7 +101,7 @@ async def dispatch(
     hyphenate: bool = True,
     render_mask: np.ndarray = None,
     line_spacing: int = None,
-    disable_font_border: bool = False
+    disable_font_border: bool = False,
     ) -> np.ndarray:
 
     text_render.set_font(font_path)
@@ -112,6 +114,12 @@ async def dispatch(
 
     # Render text
     for region, dst_points in tqdm(zip(text_regions, dst_points_list), '[render]', total=len(text_regions)):
+        if config.render.alignment:
+            region._alignment = config.render.alignment
+        if config.render.direction:
+            logger.info(f"region._direction - before: {region._direction}, {str(region._direction)}")
+            region._direction = config.render.direction
+            logger.info(f"region._direction - after: {region._direction}, {str(region._direction)}")
         if render_mask is not None:
             # set render_mask to 1 for the region that is inside dst_points
             cv2.fillConvexPoly(render_mask, dst_points.astype(np.int32), 1)
