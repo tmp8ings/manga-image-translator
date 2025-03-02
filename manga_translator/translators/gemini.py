@@ -42,15 +42,12 @@ class GeminiTranslator(ConfigGPT, CommonTranslator):
 
     def _configure_safety_settings(self):
         """Configure safety settings to have the lowest possible blocking levels."""
-        safety_settings = []
-        for category in genai.types.HarmCategory:
-            safety_settings.append(
-                {
-                    "category": category,
-                    "threshold": genai.types.HarmBlockThreshold.BLOCK_NONE,
-                }
-            )
-        return safety_settings
+        return [
+            {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+            {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+            {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+            {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
+        ]
 
     def _configure_generation_config(self):
         """Configure generation settings for the model."""
