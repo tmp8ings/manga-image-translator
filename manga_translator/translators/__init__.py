@@ -66,8 +66,8 @@ translator_cache = {}
 logger = logging.getLogger("manga_translator")
 
 def get_translator(key: Translator, *args, **kwargs) -> CommonTranslator:
-    logger.info(key)
-    logger.info(TRANSLATORS)
+    # logger.info(key)
+    # logger.info(TRANSLATORS)
     if key not in TRANSLATORS:
         raise ValueError(f'Could not find translator for: "{key}". Choose from the following: %s' % ','.join(TRANSLATORS))
     if key not in translator_cache:
@@ -78,8 +78,8 @@ def get_translator(key: Translator, *args, **kwargs) -> CommonTranslator:
 prepare_selective_translator(get_translator)
 
 async def prepare(chain: TranslatorChain):
-    logger.info(chain)
-    logger.info(chain.chain) 
+    # logger.info(chain)
+    # logger.info(chain.chain) 
     for key, tgt_lang in chain.chain:
         translator = get_translator(key)
         translator.supports_languages('auto', tgt_lang, fatal=True)

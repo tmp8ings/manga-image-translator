@@ -210,12 +210,12 @@ class MangaTranslator:
             await prepare_detection(config.detector.detector)
             await prepare_ocr(config.ocr.ocr, self.device)
             await prepare_inpainting(config.inpainter.inpainter, self.device)
-            logger.info("Loading translation models")
-            logger.info(f"{config}")
-            logger.info(f"{config.translator}")
-            logger.info(f"{config.translator.translator_gen}")
+            # logger.info("Loading translation models")
+            # logger.info(f"{config}")
+            # logger.info(f"{config.translator}")
+            # logger.info(f"{config.translator.translator_gen}")
             await prepare_translation(config.translator.translator_gen)
-            logger.info("Finished translation models")
+            # logger.info("Finished translation models")
             if config.colorizer.colorizer != Colorizer.none:
                 await prepare_colorization(config.colorizer.colorizer)
 
@@ -669,9 +669,9 @@ class MangaTranslator:
             ) as f:
                 translated_sentences = json.load(f)
         else:
-            logger.info(
-                f"original texts: {[region.text for region in ctx.text_regions]}"
-            )
+            # logger.info(
+            #     f"original texts: {[region.text for region in ctx.text_regions]}"
+            # )
             translated_sentences = await dispatch_translation(
                 config.translator.translator_gen,
                 [region.text for region in ctx.text_regions],
@@ -680,7 +680,7 @@ class MangaTranslator:
                 ctx,
                 "cpu" if self._gpu_limited_memory else self.device,
             )
-            logger.info(f"translated_sentences: {translated_sentences}")
+            # logger.info(f"translated_sentences: {translated_sentences}")
 
             # Save translation if args.save_text is set and quit
             if self.save_text:
