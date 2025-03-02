@@ -5,24 +5,59 @@ import shutil
 import signal
 import subprocess
 import sys
+import logging
+import traceback
 from argparse import Namespace
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-
 from fastapi import FastAPI, Request, HTTPException, Header, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, HTMLResponse
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from pathlib import Path
 
-from manga_translator import Config
-from server.instance import ExecutorInstance, executor_instances
-from server.myqueue import task_queue
-from server.request_extraction import get_ctx, while_streaming, TranslateRequest
-from server.to_json import to_translation, TranslationResponse
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    handlers=[logging.StreamHandler()]
+)
+logger = logging.getLogger("manga-translator")
 
 app = FastAPI()
 nonce = None
+
+# Add middleware to log requests and responses
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    try:
+        response = await call_next(request)
+        if response.status_code >= 400:
+            logger.error(f"HTTP Error {response.status_code}: {request.method} {request.url.path}")
+        return response
+    except Exception as e:
+        logger.error(f"Unhandled exception in {request.method} {request.url.path}: {str(e)}")
+        logger.error(traceback.format_exc())
+        raise
+
+# Add exception handlers for different types of errors
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    logger.error(f"HTTP {exc.status_code}: {exc.detail} at {request.method} {request.url.path}")
+    return {"detail": exc.detail}, exc.status_code
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    logger.error(f"Validation error at {request.method} {request.url.path}: {str(exc)}")
+    return {"detail": str(exc)}, 422
+
+@app.exception_handler(Exception)
+async def general_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Unhandled exception at {request.method} {request.url.path}: {str(exc)}")
+    logger.error(traceback.format_exc())
+    return {"detail": "Internal server error"}, 500
 
 app.add_middleware(
     CORSMiddleware,
@@ -197,8 +232,14 @@ if __name__ == '__main__':
     args.start_instance = True
     proc = prepare(args)
     print("Nonce: "+nonce)
+    
+    # Set Uvicorn log level
+    log_level = "debug" if args.verbose else "info"
+    
     try:
-        uvicorn.run(app, host=args.host, port=args.port)
-    except Exception:
+        uvicorn.run(app, host=args.host, port=args.port, log_level=log_level)
+    except Exception as e:
+        logger.critical(f"Server crashed: {str(e)}")
+        logger.critical(traceback.format_exc())
         if proc:
             proc.terminate()
