@@ -61,13 +61,13 @@ class Renderer(str, Enum):
     manga2Eng = "manga2eng"
     none = "none"
 
-class Alignment(StrEnum):
+class Alignment(str, Enum):
     auto = "auto"
     left = "left"
     center = "center"
     right = "right"
 
-class Direction(StrEnum):
+class Direction(str, Enum):
     auto = "auto"
     h = "horizontal"
     v = "vertical"
