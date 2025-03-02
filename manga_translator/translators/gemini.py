@@ -42,7 +42,7 @@ class GeminiTranslator(ConfigGPT, CommonTranslator):
         safety_settings = []
         for category in genai.types.HarmCategory:
             safety_settings.append(
-                {"category": category, "threshold": genai.types.HarmBlockThreshold.OFF}
+                {"category": category, "threshold": genai.types.HarmBlockThreshold.BLOCK_NONE}
             )
         return safety_settings
 
