@@ -360,7 +360,11 @@ class MangaTranslator:
             )
         # -- Rendering
         await self._report_progress("rendering")
-        ctx.img_rendered = await self._run_text_rendering(config, ctx)
+        try:
+            ctx.img_rendered = await self._run_text_rendering(config, ctx)
+        except Exception as e:
+            logger.error(f"Error during rendering: {str(e)}", exc_info=True)
+            raise e
 
         await self._report_progress("finished", True)
         ctx.result = dump_image(ctx.input, ctx.img_rendered, ctx.img_alpha)
