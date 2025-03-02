@@ -1,4 +1,5 @@
 import cv2
+from manga_translator.utils.log import get_logger
 import numpy as np
 from typing import List, Tuple
 from shapely.geometry import Polygon, MultiPoint
@@ -9,6 +10,8 @@ import py3langid as langid
 
 from .generic import color_difference, is_right_to_left_char, is_valuable_char
 # from ..detection.ctd_utils.utils.imgproc_utils import union_area, xywh2xyxypoly
+
+logger = get_logger('textblock')
 
 # LANG_LIST = ['eng', 'ja', 'unknown']
 # LANGCLS2IDX = {'eng': 0, 'ja': 1, 'unknown': 2}
@@ -375,6 +378,7 @@ class TextBlock(object):
     @property
     def direction(self):
         """Render direction determined through used language or aspect ratio."""
+        logger.info("in direction method: {self._direction}")
         if self._direction not in ('h', 'v', 'hr', 'vr'):
             d = LANGUAGE_ORIENTATION_PRESETS.get(self.target_lang)
             if d in ('h', 'v', 'hr', 'vr'):
