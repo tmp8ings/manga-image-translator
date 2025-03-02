@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import time
+import google.api_core.exceptions
 import re
 from typing import List
 
@@ -181,7 +182,7 @@ class GeminiTranslator(ConfigGPT, CommonTranslator):
         except genai.types.BlockedPromptException as e:
             self.logger.error(f"Blocked prompt error: {e}")
             raise
-        except genai.types.RetryException as e:
+        except google.api_core.exceptions.RetryError as e:
             self.logger.error(f"Gemini rate limit exceeded or API error: {e}")
             raise
         except Exception as e:
