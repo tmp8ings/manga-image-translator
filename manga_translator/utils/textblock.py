@@ -120,6 +120,9 @@ class TextBlock(object):
     
     def __str__(self):
         return f"TextBlock(text: {self.text[:3]}, angle: {self.angle}, direction: {self.direction}, alignment: {self.alignment})"
+    
+    def __repr__(self):
+        return self.__str__()
 
     @cached_property
     def xyxy(self):
