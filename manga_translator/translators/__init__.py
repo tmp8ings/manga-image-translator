@@ -78,6 +78,8 @@ def get_translator(key: Translator, *args, **kwargs) -> CommonTranslator:
 prepare_selective_translator(get_translator)
 
 async def prepare(chain: TranslatorChain):
+    logger.info(chain)
+    logger.info(chain.chain) 
     for key, tgt_lang in chain.chain:
         translator = get_translator(key)
         translator.supports_languages('auto', tgt_lang, fatal=True)
