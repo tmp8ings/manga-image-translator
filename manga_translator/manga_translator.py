@@ -205,22 +205,25 @@ class MangaTranslator:
         # preload and download models (not strictly necessary, remove to lazy load)
         if self.models_ttl == 0:
             logger.info("Loading models")
-            if config.upscale.upscale_ratio:
-                await prepare_upscaling(config.upscale.upscaler)
-            await prepare_detection(config.detector.detector)
-            await prepare_ocr(config.ocr.ocr, self.device)
-            await prepare_inpainting(config.inpainter.inpainter, self.device)
-            # logger.info("Loading translation models")
-            # logger.info(f"{config}")
-            # logger.info(f"{config.translator}")
-            # logger.info(f"{config.translator.translator_gen}")
-            await prepare_translation(config.translator.translator_gen)
-            # logger.info("Finished translation models")
-            if config.colorizer.colorizer != Colorizer.none:
-                await prepare_colorization(config.colorizer.colorizer)
+            try:
+                if config.upscale.upscale_ratio:
+                    await prepare_upscaling(config.upscale.upscaler)
+                await prepare_detection(config.detector.detector)
+                await prepare_ocr(config.ocr.ocr, self.device)
+                await prepare_inpainting(config.inpainter.inpainter, self.device)
+                await prepare_translation(config.translator.translator_gen)
+                if config.colorizer.colorizer != Colorizer.none:
+                    await prepare_colorization(config.colorizer.colorizer)
+            except Exception as e:
+                logger.error(f"Error while loading models: {str(e)}", exc_info=True)
+                raise e
 
         # translate
-        return await self._translate(config, ctx)
+        try:
+            return await self._translate(config, ctx)
+        except Exception as e:
+            logger.error(f"Error during _translate: {str(e)}", exc_info=True)
+            raise e
 
     async def _translate(self, config: Config, ctx: Context) -> Context:
         logger.info("_translate")
