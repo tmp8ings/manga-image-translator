@@ -186,6 +186,7 @@ class MangaTranslator:
             logger.info('Loading translation models')
             logger.info(f"{config}")
             logger.info(f"{config.translator}")
+            logger.info(f"{config.translator.translator_gen}")
             await prepare_translation(config.translator.translator_gen)
             logger.info('Finished translation models')
             if config.colorizer.colorizer != Colorizer.none:

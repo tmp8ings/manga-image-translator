@@ -42,6 +42,8 @@ async def log_requests(request: Request, call_next):
         response = await call_next(request)
         if response.status_code >= 400:
             logger.error(f"HTTP Error {response.status_code}: {request.method} {request.url.path}")
+        else:
+            logger.info(f"HTTP {response.status_code}: {request.method} {request.url.path}")
         return response
     except Exception as e:
         logger.error(f"Unhandled exception in {request.method} {request.url.path}: {str(e)}")
