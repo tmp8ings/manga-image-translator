@@ -119,7 +119,7 @@ class TextBlock(object):
         self.shadow_offset = shadow_offset
     
     def __str__(self):
-        return f"TextBlock(text: {self.text[:3]}, angle: {self.angle}, direction: {self.direction}, alignment: {self.alignment})"
+        return f"TextBlock(text: {self.text[:3]}, angle: {self.angle}, direction: {self.direction}, alignment: {self._alignment})"
 
     @cached_property
     def xyxy(self):

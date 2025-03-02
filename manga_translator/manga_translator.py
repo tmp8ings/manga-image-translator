@@ -709,7 +709,7 @@ class MangaTranslator:
             region.translation = translation
             region.target_lang = config.translator.target_lang
             if config.render.alignment:
-                region._alignment = region.alignment = config.render.alignment
+                region._alignment = config.render.alignment
             if config.render.direction:
                 region._direction = region.direction = config.render.direction
 
