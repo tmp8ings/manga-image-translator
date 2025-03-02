@@ -9,6 +9,7 @@ from .keys import GOOGLE_API_KEY, GOOGLE_HTTP_PROXY
 
 import google.generativeai as genai
 
+logger = logging.getLogger('manga_translator')
 
 class GeminiTranslator(ConfigGPT, CommonTranslator):
     _LANGUAGE_CODE_MAP = VALID_LANGUAGES
@@ -157,7 +158,7 @@ class GeminiTranslator(ConfigGPT, CommonTranslator):
                 genai.types.content.Content(parts=[msg["content"]], role=msg["role"])
                 for msg in messages
             ]
-            print(model_messages)
+            logger.info(model_messages)
             response = self.model.generate_content(
                 contents=model_messages,
                 generation_config=self.generation_config,
