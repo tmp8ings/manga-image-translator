@@ -7,6 +7,8 @@ from shapely import affinity
 from shapely.geometry import Polygon
 from tqdm import tqdm
 
+from manga_translator.utils.textblock import rearrange_vertical_text_to_horizontal
+
 # from .ballon_extractor import extract_ballon_region
 from . import text_render
 from .text_render_eng import render_textblock_list_eng
@@ -106,6 +108,8 @@ async def dispatch(
 
     text_render.set_font(font_path)
     text_regions = list(filter(lambda region: region.translation, text_regions))
+    
+    text_regions = rearrange_vertical_text_to_horizontal(text_regions, img)
 
     # Resize regions that are too small
     dst_points_list = resize_regions_to_font_size(img, text_regions, font_size_fixed, font_size_offset, font_size_minimum)
