@@ -550,10 +550,11 @@ def find_background_candidates(
     img: np.ndarray, 
     min_width: int = 100, 
     min_height: int = 50,
-    quality_threshold: float = 1500
+    quality_threshold: float = 3000  # Increased threshold to be more lenient
 ) -> List[Tuple[int, int, int, int]]:
     """
     Find regions with relatively uniform background suitable for text placement.
+    Uses multiple methods to detect candidate regions.
     
     Args:
         img: Input image
@@ -567,39 +568,135 @@ def find_background_candidates(
     h, w = img.shape[:2]
     regions = []
     
-    # Define various region sizes to try
-    grid_sizes = [(100, 50), (150, 80), (200, 100), (250, 120), (300, 150)]
-    step_size = 50
+    # Define various region sizes to try (more variety)
+    grid_sizes = [(100, 40), (120, 60), (150, 60), (180, 80), (200, 80), (250, 100), (300, 120)]
+    
+    # More aggressive step size for denser sampling
+    step_size = 30
     
     # Convert to grayscale once for efficiency
     gray_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     
-    # Calculate edge map once for efficiency
-    edge_map = cv2.Canny(gray_img, 50, 150)
+    # Calculate edge map with multiple parameters for better detection
+    edge_map1 = cv2.Canny(gray_img, 30, 100)  # More sensitive
+    edge_map2 = cv2.Canny(gray_img, 50, 150)  # Standard
+    edge_map = cv2.bitwise_or(edge_map1, edge_map2)
     
-    # Scan the image with multiple region sizes
+    # Apply slight blur to reduce noise sensitivity
+    blurred_gray = cv2.GaussianBlur(gray_img, (5, 5), 0)
+    
+    # Calculate auto threshold for adaptive behavior
+    mean_val = np.mean(gray_img)
+    std_val = np.std(gray_img)
+    auto_threshold = quality_threshold * (1 + (std_val / 128) * 0.5)  # Adjust threshold based on image complexity
+    
+    # Pre-compute scan positions to avoid duplicates
+    positions = []
     for grid_w, grid_h in grid_sizes:
         for y in range(0, h - grid_h, step_size):
             for x in range(0, w - grid_w, step_size):
                 if x + min_width > w or y + min_height > h:
                     continue
-                    
-                # Extract region
-                region = gray_img[y:y+grid_h, x:x+grid_w]
-                region_edges = edge_map[y:y+grid_h, x:x+grid_w]
-                
-                # Calculate metrics for region quality
-                variance = np.var(region)  # Lower variance = more uniform color
-                edge_density = np.sum(region_edges > 0) / (grid_w * grid_h)  # Lower = fewer edges
-                
-                # Combined score (lower is better) - relaxed criteria
-                score = variance * 0.5 + edge_density * 800
-                
-                # Only add regions below the quality threshold
-                if score < quality_threshold:
-                    regions.append((x, y, grid_w, grid_h))
+                positions.append((x, y, grid_w, grid_h))
     
-    return regions
+    # For each possible region
+    for x, y, grid_w, grid_h in positions:
+        # Extract region
+        region = gray_img[y:y+grid_h, x:x+grid_w]
+        region_edges = edge_map[y:y+grid_h, x:x+grid_w]
+        region_blurred = blurred_gray[y:y+grid_h, x:x+grid_w]
+        
+        # Multiple quality metrics
+        # 1. Color variance (lower is better)
+        variance = np.var(region)
+        
+        # 2. Edge density (lower is better)
+        edge_density = np.sum(region_edges > 0) / (grid_w * grid_h)
+        
+        # 3. Brightness uniformity (higher is better)
+        brightness = np.mean(region_blurred)
+        brightness_var = np.var(region_blurred) / (brightness + 1e-6)  # Normalized variance
+        
+        # 4. Texture uniformity using local binary patterns or simple gradient magnitude
+        gradient_x = cv2.Sobel(region_blurred, cv2.CV_64F, 1, 0, ksize=3)
+        gradient_y = cv2.Sobel(region_blurred, cv2.CV_64F, 0, 1, ksize=3)
+        gradient_mag = np.sqrt(gradient_x**2 + gradient_y**2)
+        texture_score = np.mean(gradient_mag)
+        
+        # 5. Region location preference (prefer edges and corners less)
+        center_x, center_y = w/2, h/2
+        dist_from_center = np.sqrt((x+grid_w/2-center_x)**2 + (y+grid_h/2-center_y)**2) / np.sqrt(center_x**2 + center_y**2)
+        location_penalty = 0
+        
+        # Penalize extreme edge regions
+        if x < w*0.05 or x > w*0.9 or y < h*0.05 or y > h*0.9:
+            location_penalty = 100
+        
+        # Combined score calculation with weighted factors
+        # Lower score is better for background regions
+        score = (
+            variance * 0.3 +                     # Color uniformity
+            edge_density * 600 +                 # Edge presence
+            brightness_var * 200 +               # Brightness consistency
+            texture_score * 10 +                 # Texture smoothness
+            location_penalty                     # Location suitability
+        )
+            
+        # Only add regions below the adaptive threshold 
+        if score < auto_threshold:
+            regions.append((x, y, grid_w, grid_h))
+    
+    # If we still didn't find enough regions, try with even more relaxed criteria
+    if len(regions) < 3:
+        logger.debug(f"First pass found only {len(regions)} regions, trying with relaxed criteria")
+        relaxed_regions = []
+        relaxed_threshold = auto_threshold * 1.5
+        
+        for x, y, grid_w, grid_h in positions:
+            # Skip small regions
+            if grid_w < min_width or grid_h < min_height:
+                continue
+                
+            # Simple variance check only
+            region = gray_img[y:y+grid_h, x:x+grid_w]
+            variance = np.var(region)
+            
+            # Add region if it's relatively uniform
+            if variance < 1000:  # Very permissive threshold
+                relaxed_regions.append((x, y, grid_w, grid_h))
+        
+        # Add these relaxed regions to our candidates
+        regions.extend(relaxed_regions)
+    
+    # Ensure we have at least some candidates
+    if len(regions) == 0:
+        logger.warning("Could not find any suitable background region, using default regions")
+        # Add some default regions spanning the image width
+        regions = [
+            (10, 10, w-20, 80),                   # Top band
+            (10, h//2-40, w-20, 80),             # Middle band
+            (10, h-90, w-20, 80)                 # Bottom band
+        ]
+    
+    # Remove duplicates (regions that are too similar)
+    unique_regions = []
+    for region in regions:
+        x1, y1, w1, h1 = region
+        is_duplicate = False
+        
+        for unique_region in unique_regions:
+            x2, y2, w2, h2 = unique_region
+            # If centers are close and sizes are similar, consider it a duplicate
+            if (abs(x1+w1/2 - (x2+w2/2)) < max(w1, w2) * 0.3 and 
+                abs(y1+h1/2 - (y2+h2/2)) < max(h1, h2) * 0.3):
+                is_duplicate = True
+                break
+        
+        if not is_duplicate:
+            unique_regions.append(region)
+    
+    logger.debug(f"Found {len(unique_regions)} unique background candidate regions")
+    return unique_regions
 
 
 def rearrange_vertical_text_to_horizontal(
