@@ -584,7 +584,7 @@ class TextBlock(object):
         
         self.font_size = font_size
         
-        logger.debug(f"Optimized Korean font size for {text[:10]}...")
+        logger.debug(f"Optimized Korean font size for {text}")
         logger.debug(f"{original_font_size} -> {font_size} (w:{width}, h:{height}, len:{text_length})")
         return font_size
 
