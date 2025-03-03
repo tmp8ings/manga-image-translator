@@ -1064,27 +1064,42 @@ def find_best_placement(
     # Get original position and dimensions
     orig_x, orig_y = block.center
     original_width, original_height = block.unrotated_size
-
-    # Calculate appropriate dimensions for horizontal text
-    # For vertical to horizontal conversion, we need wider but shorter rectangles
-    char_width_estimate = 20  # Estimated width per character in pixels
-
-    # Calculate appropriate width based on text length
+    
+    # Calculate the original area - we want to preserve this
+    original_area = original_width * original_height
+    
+    # Calculate horizontal aspect ratio (typically horizontal text is wider than tall)
+    # For Japanese/Korean vertical text converted to horizontal, 4:1 to 5:1 is common
+    horizontal_aspect_ratio = 4.0  # width:height ratio
+    
+    # Calculate dimensions that maintain the same area but with horizontal orientation
+    # Formula: width * height = original_area and width/height = aspect_ratio
+    # Therefore: width = sqrt(original_area * aspect_ratio) and height = width / aspect_ratio
+    
+    # Calculate new width and height preserving the area
+    block_width = int(np.sqrt(original_area * horizontal_aspect_ratio))
+    block_height = int(original_area / block_width)
+    
+    # Adjust based on text length if provided
     if text_length > 0:
-        # Adjust width based on text length with some padding
-        estimated_width = min(
-            max(text_length * char_width_estimate, original_width), img.shape[1] * 0.8
-        )
-    else:
-        # If no text, use a reasonable default based on original dimensions
-        estimated_width = max(original_width * 2, original_height)
-
-    # Height is typically smaller when converting from vertical to horizontal
-    estimated_height = min(original_height / 2, 60)  # Limit height to reasonable value
-
-    # Ensure minimum dimensions
-    block_width = max(int(estimated_width), 100)
-    block_height = max(int(estimated_height), 30)
+        char_width_estimate = max(12, min(20, original_width / 2))  # Pixels per character
+        text_based_width = text_length * char_width_estimate
+        
+        # Use text-based width if it's reasonable
+        if text_based_width > block_width * 0.7 and text_based_width < block_width * 1.5:
+            # Adjust while maintaining area
+            adjusted_width = text_based_width
+            adjusted_height = original_area / adjusted_width
+            block_width = int(adjusted_width)
+            block_height = int(adjusted_height)
+    
+    # Ensure minimum dimensions and maximum dimensions
+    block_width = max(block_width, 60)
+    block_width = min(block_width, img.shape[1] - 20)
+    block_height = max(block_height, 20)
+    block_height = min(block_height, 80)  # Limit height to prevent overly tall blocks
+    
+    logger.debug(f"Original dimensions: {original_width}x{original_height}, New dimensions: {block_width}x{block_height}")
 
     # Score each candidate location
     best_score = float("inf")
@@ -1177,8 +1192,9 @@ def find_best_placement(
             return bottom_rect
 
         # Last resort: adjust width and try again with minimal width
-        min_width = min(block_width, 300)
-        min_rect = (10, 10, 10 + min_width, 10 + block_height)
+        min_width = min(block_width, 200)
+        min_height = int(original_area / min_width)  # Maintain area
+        min_rect = (10, 10, 10 + min_width, 10 + min_height)
         return min_rect
 
     return best_location
