@@ -923,23 +923,20 @@ def rearrange_vertical_text_to_horizontal(
                 overlap_detected = True
                 break
             else:
-                new_lines = [
-                    (
-                        current_x,
-                        y_position,
-                        current_x + block_width,
-                        y_position,
-                        current_x + block_width,
-                        y_position + block_height,
-                        current_x,
-                        y_position + block_height,
-                    )
-                ]
+                # 수정된 부분: new_lines를 올바른 포맷으로 구성
+                new_lines = np.array([
+                    [
+                        [current_x, y_position],  # top-left
+                        [current_x + block_width, y_position],  # top-right
+                        [current_x + block_width, y_position + block_height],  # bottom-right
+                        [current_x, y_position + block_height],  # bottom-left
+                    ]
+                ], dtype=np.int32)
+                
                 new_block = copy.deepcopy(block)
-                new_block.lines = np.array(new_lines, dtype=np.int32)
+                new_block.lines = new_lines
                 new_block._direction = "h"
                 new_block.is_rearranged = True
-                # --- End modification ---
                 temp_rearranged_blocks.append(new_block)
                 current_x += block_width + spacing
 
@@ -957,23 +954,21 @@ def rearrange_vertical_text_to_horizontal(
         for block in vertical_caption_blocks:
             block_width = block.xywh[2]
             block_height = block.xywh[3]
-            new_lines = [
-                (
-                    current_x,
-                    y_position,
-                    current_x + block_width,
-                    y_position,
-                    current_x + block_width,
-                    y_position + block_height,
-                    current_x,
-                    y_position + block_height,
-                )
-            ]
+            
+            # 수정된 부분: new_lines를 올바른 포맷으로 구성
+            new_lines = np.array([
+                [
+                    [current_x, y_position],  # top-left
+                    [current_x + block_width, y_position],  # top-right
+                    [current_x + block_width, y_position + block_height],  # bottom-right
+                    [current_x, y_position + block_height],  # bottom-left
+                ]
+            ], dtype=np.int32)
+            
             new_block = copy.deepcopy(block)
-            new_block.lines = np.array(new_lines, dtype=np.int32)
+            new_block.lines = new_lines
             new_block._direction = "h"
             new_block.is_rearranged = True
-            # --- End modification ---
             rearranged_blocks.append(new_block)
             current_x += block_width + spacing
 
