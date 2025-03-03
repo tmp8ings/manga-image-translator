@@ -848,6 +848,257 @@ def visualize_textblocks(canvas: np.ndarray, blk_list: List[TextBlock]):
 
 
 def rearrange_vertical_text_to_horizontal(text_blocks: List[TextBlock], img: np.ndarray) -> List[TextBlock]:
+    """
+    Rearrange vertical caption text to horizontal positions in the image
+    
+    Args:
+        text_blocks: List of TextBlock objects
+        img: Source image
+    
+    Returns:
+        List[TextBlock]: List of TextBlocks after rearrangement
+    """
     # Separate vertical caption and horizontal blocks
-    vertical_caption_blocks: List[TextBlock] = []
-    horizontal_blocks: List[TextBlock] = []
+    vertical_caption_blocks = []
+    horizontal_blocks = []
+    
+    for blk in text_blocks:
+        if blk.is_vertical_caption(img):
+            vertical_caption_blocks.append(blk)
+        else:
+            horizontal_blocks.append(blk)
+    
+    if not vertical_caption_blocks:
+        return text_blocks  # No vertical captions to rearrange
+    
+    # Sort vertical captions by reading order (top to bottom, right to left)
+    vertical_caption_blocks.sort(key=lambda blk: (blk.center[0], blk.center[1]))
+    
+    # Find candidate locations for placement
+    candidate_locations = find_candidate_locations(img, horizontal_blocks)
+    
+    # Process each vertical caption block
+    for vcap_block in vertical_caption_blocks:
+        # Change direction to horizontal
+        vcap_block._direction = "h"
+        
+        # Find best placement location
+        best_location = find_best_placement(vcap_block, candidate_locations, horizontal_blocks, img)
+        
+        # Update block position
+        if best_location:
+            # Calculate new lines based on best_location
+            new_lines = create_horizontal_lines(vcap_block, best_location)
+            vcap_block.lines = new_lines
+            vcap_block.is_rearranged = True  # Mark as rearranged
+            
+            # Update horizontal_blocks to include this rearranged block
+            horizontal_blocks.append(vcap_block)
+    
+    # Return all blocks (both original horizontal and rearranged vertical)
+    return horizontal_blocks + [blk for blk in vertical_caption_blocks if not blk.is_rearranged]
+
+def find_candidate_locations(img: np.ndarray, existing_blocks: List[TextBlock]) -> List[Tuple[int, int, int, int]]:
+    """
+    Find candidate locations for text block placement based on image background
+    
+    Args:
+        img: Source image
+        existing_blocks: List of existing text blocks
+    
+    Returns:
+        List of (x1, y1, x2, y2) tuples representing candidate locations
+    """
+    height, width = img.shape[:2]
+    
+    # Create a mask of existing blocks
+    mask = np.zeros((height, width), dtype=np.uint8)
+    for block in existing_blocks:
+        x1, y1, x2, y2 = block.xyxy
+        mask[y1:y2, x1:x2] = 255
+    
+    # Potential candidate regions
+    candidates = []
+    
+    # Check top and bottom regions (divided into segments)
+    segment_width = width // 3
+    
+    # Top regions
+    for i in range(3):
+        x1 = i * segment_width
+        x2 = (i + 1) * segment_width
+        y1 = 0
+        y2 = height // 4  # Top quarter of the image
+        
+        # Check if this region is suitable (low variance, few existing blocks)
+        region = img[y1:y2, x1:x2]
+        mask_region = mask[y1:y2, x1:x2]
+        
+        if is_suitable_region(region, mask_region):
+            candidates.append((x1, y1, x2, y2))
+    
+    # Bottom regions
+    for i in range(3):
+        x1 = i * segment_width
+        x2 = (i + 1) * segment_width
+        y1 = height - height // 4  # Bottom quarter
+        y2 = height
+        
+        region = img[y1:y2, x1:x2]
+        mask_region = mask[y1:y2, x1:x2]
+        
+        if is_suitable_region(region, mask_region):
+            candidates.append((x1, y1, x2, y2))
+    
+    # Check left and right margins
+    margin_width = width // 8
+    
+    # Left margin
+    x1, y1, x2, y2 = 0, height // 4, margin_width, height - height // 4
+    if is_suitable_region(img[y1:y2, x1:x2], mask[y1:y2, x1:x2]):
+        candidates.append((x1, y1, x2, y2))
+    
+    # Right margin
+    x1, y1, x2, y2 = width - margin_width, height // 4, width, height - height // 4
+    if is_suitable_region(img[y1:y2, x1:x2], mask[y1:y2, x1:x2]):
+        candidates.append((x1, y1, x2, y2))
+    
+    return candidates
+
+def is_suitable_region(img_region: np.ndarray, mask_region: np.ndarray) -> bool:
+    """
+    Determine if a region is suitable for text placement
+    
+    Args:
+        img_region: Image region
+        mask_region: Mask indicating occupied areas
+    
+    Returns:
+        bool: True if region is suitable for text placement
+    """
+    if img_region.size == 0:
+        return False
+        
+    # Check if region is already mostly occupied
+    if np.mean(mask_region) > 20:  # More than ~8% occupied
+        return False
+    
+    # Convert to grayscale if needed
+    if len(img_region.shape) > 2:
+        gray_region = cv2.cvtColor(img_region, cv2.COLOR_BGR2GRAY)
+    else:
+        gray_region = img_region
+    
+    # Calculate variance to check for uniform background
+    variance = np.var(gray_region)
+    
+    # Check edge density using Canny edge detector
+    edges = cv2.Canny(gray_region, 50, 150)
+    edge_density = np.mean(edges) / 255.0
+    
+    # Region is suitable if it has low variance and low edge density
+    return variance < 900 and edge_density < 0.1
+
+def find_best_placement(block: TextBlock, candidates: List[Tuple[int, int, int, int]], 
+                        existing_blocks: List[TextBlock], img: np.ndarray) -> Tuple[int, int, int, int]:
+    """
+    Find the best placement location for a text block
+    
+    Args:
+        block: TextBlock to place
+        candidates: List of candidate locations
+        existing_blocks: List of existing text blocks
+        img: Source image
+    
+    Returns:
+        Tuple (x1, y1, x2, y2) representing the best location to place the block
+    """
+    # Get block dimensions (width and height)
+    _, block_height = block.unrotated_size
+    block_width = int(block_height * 4)  # Estimate width needs for horizontal text
+    
+    # Get original position
+    orig_x, orig_y = block.center
+    
+    # Score each candidate location
+    best_score = float('inf')
+    best_location = None
+    
+    # If no candidates, check top and bottom edges
+    if not candidates:
+        img_height, img_width = img.shape[:2]
+        # Check top edge
+        candidates.append((0, 0, img_width, img_height // 8))
+        # Check bottom edge
+        candidates.append((0, img_height - img_height // 8, img_width, img_height))
+    
+    for x1, y1, x2, y2 in candidates:
+        # Check if the block fits in this region
+        if x2-x1 < block_width or y2-y1 < block_height:
+            continue
+            
+        # Try different positions within the candidate region
+        for test_y in range(y1, y2 - int(block_height), max(1, int(block_height//4))):
+            for test_x in range(x1, x2 - block_width, max(1, int(block_width//4))):
+                # Create test rectangle
+                test_rect = (test_x, test_y, test_x + block_width, test_y + int(block_height))
+                
+                # Check for overlaps with existing blocks
+                if any(blocks_overlap(test_rect, existing.xyxy) for existing in existing_blocks):
+                    continue
+                
+                # Calculate score based on distance from original position and reading order
+                distance_score = np.sqrt((test_x - orig_x)**2 + (test_y - orig_y)**2)
+                
+                # Prefer keeping text at similar vertical level
+                vertical_penalty = abs(test_y - orig_y) * 2
+                
+                total_score = distance_score + vertical_penalty
+                
+                if total_score < best_score:
+                    best_score = total_score
+                    best_location = test_rect
+    
+    return best_location
+
+def blocks_overlap(rect1, rect2):
+    """
+    Check if two rectangles (x1, y1, x2, y2) overlap
+    """
+    x1_1, y1_1, x2_1, y2_1 = rect1
+    x1_2, y1_2, x2_2, y2_2 = rect2
+    
+    # Check if one rectangle is to the left of the other
+    if x2_1 < x1_2 or x2_2 < x1_1:
+        return False
+    
+    # Check if one rectangle is above the other
+    if y2_1 < y1_2 or y2_2 < y1_1:
+        return False
+    
+    return True
+
+def create_horizontal_lines(block: TextBlock, new_location: Tuple[int, int, int, int]) -> np.ndarray:
+    """
+    Create new lines for the block in its new horizontal position
+    
+    Args:
+        block: TextBlock to modify
+        new_location: (x1, y1, x2, y2) for the new location
+    
+    Returns:
+        np.ndarray: Array of lines in the new location with correct type
+    """
+    x1, y1, x2, y2 = new_location
+    
+    # Create a single rectangular line with 4 points (x,y coordinates)
+    # Format matches TextBlock's line format
+    new_line = np.array([
+        [x1, y1],  # top-left
+        [x2, y1],  # top-right
+        [x2, y2],  # bottom-right
+        [x1, y2]   # bottom-left
+    ], dtype=np.int32)
+    
+    # Return as a single-element array with the correct shape
+    return np.array([new_line], dtype=np.int32)
