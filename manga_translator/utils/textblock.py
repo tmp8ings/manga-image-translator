@@ -859,14 +859,8 @@ def rearrange_vertical_text_to_horizontal(text_blocks: List[TextBlock], img: np.
         List[TextBlock]: List of TextBlocks after rearrangement
     """
     # Separate vertical caption and horizontal blocks
-    vertical_caption_blocks = []
-    horizontal_blocks = []
-    
-    for blk in text_blocks:
-        if blk.is_vertical_caption(img):
-            vertical_caption_blocks.append(blk)
-        else:
-            horizontal_blocks.append(blk)
+    vertical_caption_blocks = [blk for blk in text_blocks if blk.is_vertical_caption(img)]
+    horizontal_blocks = [blk for blk in text_blocks if not blk.is_vertical_caption(img)]
     
     if not vertical_caption_blocks:
         return text_blocks  # No vertical captions to rearrange
