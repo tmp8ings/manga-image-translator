@@ -503,77 +503,69 @@ class TextBlock(object):
         """재배치 여부 설정 속성"""
         self._is_rearranged = value
 
-    def optimize_font_size(self, min_size=8, max_size=60, target_fill_ratio=0.7):
+    def optimize_font_size(self, min_size=12, max_size=72, target_fill_ratio=0.9):
         """
-        Optimize font size based on text box dimensions, text content and length.
+        Optimize the font size based on text content and box dimensions.
         
         Args:
-            min_size (int): Minimum font size to allow
-            max_size (int): Maximum font size to allow
+            min_size (int): Minimum acceptable font size
+            max_size (int): Maximum acceptable font size
             target_fill_ratio (float): Target ratio of text area to box area (0.0-1.0)
             
         Returns:
-            int: Optimized font size
+            int: The optimized font size
         """
-        # Get text to use for calculation (translation if available, otherwise original text)
-        text = self.translation if self.translation else self.text
-        if not text:
-            return self.font_size  # Keep current size if no text
-            
         # Get box dimensions
-        if self.vertical or self.direction.startswith('v'):
-            box_width, box_height = self.unrotated_size
-            is_vertical = True
+        width, height = self.unrotated_size
+        box_area = width * height
+        
+        if not self.translation and not self.text:
+            return self.font_size  # Keep current font size if no text
+            
+        text = self.translation if self.translation else self.text
+        text_length = len(text)
+        
+        # Estimate character count per line based on direction
+        if self.direction.startswith('v'):
+            # For vertical text, adjust for vertical rendering
+            estimated_lines = max(1, min(text_length, int(height / 30)))
+            chars_per_line = text_length / estimated_lines
         else:
-            box_width, box_height = self.unrotated_size
-            is_vertical = False
+            # For horizontal text, determine language characteristics
+            if self.source_lang in ['JPN', 'KOR', 'CHS', 'CHT'] or any('\u3000' <= c <= '\u9fff' for c in text):
+                avg_char_width_ratio = 1.0  # Square-ish CJK characters
+            else:
+                avg_char_width_ratio = 0.6  # Latin characters are narrower
+                
+            # Calculate optimal lines for the space
+            lines_by_width = max(1, min(int(text_length * avg_char_width_ratio * 15 / width), 10))
+            chars_per_line = text_length / lines_by_width
             
-        # Calculate area available for text
-        box_area = box_width * box_height
-        
-        # Get character count
-        char_count = len(text)
-        
-        # Calculate base size based on box dimensions and text length
-        if is_vertical:
-            # For vertical text, height is divided by character count
-            base_size = min(box_height / (char_count * 1.2), box_width * 0.95)
-        else:
-            # For horizontal text, width is the main constraint
-            # Estimate average characters per line based on box aspect ratio
-            estimated_lines = max(1, min(5, round(box_height / (box_width * 0.5))))
-            chars_per_line = char_count / estimated_lines
-            base_size = min(box_width / (chars_per_line * 0.6), box_height / (estimated_lines * 1.4))
-        
-        # Adjust for text content
-        # CJK characters need more space
-        has_cjk = any('\u3000' <= c <= '\u9fff' for c in text)
-        if has_cjk:
-            base_size *= 0.85  # CJK characters need more space
+            # Calculate font size based on available space and character count
+            width_based_size = width / (chars_per_line * avg_char_width_ratio)
+            height_based_size = height / (lines_by_width * self.line_spacing)
             
-        # Adjust for punctuation density
-        punctuation_count = sum(1 for c in text if c in '.,!?;:()[]{}"\'')
-        if punctuation_count > char_count * 0.1:
-            base_size *= 1.1  # Text with lots of punctuation can be sized larger
-        
-        # Consider text density and fill ratio
-        if char_count > 100:  # Long text
-            base_size *= 0.9
-        elif char_count < 20:  # Short text
-            base_size *= 1.2
+            calculated_font_size = min(width_based_size, height_based_size) * target_fill_ratio
             
-        # Scale by target fill ratio
-        base_size *= target_fill_ratio
+            # Apply size constraints with a preference for larger sizes
+            calculated_font_size = max(min_size, min(calculated_font_size * 1.1, max_size))
+            
+            # Round to integer
+            self.font_size = int(round(calculated_font_size))
+            
+            logger.debug(f"Optimized font size for '{text[:10]}...': {self.font_size} (w:{width}, h:{height})")
+            return self.font_size
+            
+        # Fallback calculation for cases not covered above
+        # This ensures a more aggressive sizing approach
+        default_size = max(
+            min_size,
+            min(int(width / (chars_per_line * 0.7)), int(height / 1.5))
+        )
+        self.font_size = min(default_size, max_size)
         
-        # Apply min/max constraints and round to integer
-        optimized_size = max(min_size, min(max_size, round(base_size)))
-        
-        logger.debug(f"Optimized font size: {self.font_size} -> {optimized_size} for text: {text[:20]}...")
-        
-        # Update font size
-        self.font_size = optimized_size
-        
-        return optimized_size
+        logger.debug(f"Fallback font size for '{text[:10]}...': {self.font_size}")
+        return self.font_size
 
 
 def rotate_polygons(center, polygons, rotation, new_center=None, to_int=True):
@@ -738,89 +730,6 @@ def sort_regions(regions: List[TextBlock], right_to_left=True) -> List[TextBlock
 #     blk_list.sort(key=lambda blk: blk.distance[0])
 #     merged_list = []
 #     for ii, current_blk in enumerate(blk_list):
-#         if current_blk.merged:
-#             continue
-#         for jj, blk in enumerate(blk_list[ii+1:]):
-#             try_merge_textline(current_blk, blk)
-#         merged_list.append(current_blk)
-#     for blk in merged_list:
-#         blk.adjust_bbox(with_bbox=False)
-#     return merged_list
-
-# def split_textblk(blk: TextBlock):
-#     font_size, distance, lines = blk.font_size, blk.distance, blk.lines
-#     l0 = np.array(blk.lines[0])
-#     lines.sort(key=lambda line: np.linalg.norm(np.array(line[0]) - l0[0]))
-#     distance_tol = font_size * 2
-#     current_blk = copy.deepcopy(blk)
-#     current_blk.lines = [l0]
-#     sub_blk_list = [current_blk]
-#     textblock_splitted = False
-#     for jj, line in enumerate(lines[1:]):
-#         l1, l2 = Polygon(lines[jj]), Polygon(line)
-#         split = False
-#         if not l1.intersects(l2):
-#             line_disance = abs(distance[jj+1] - distance[jj])
-#             if line_disance > distance_tol:
-#                 split = True
-#             elif blk.vertical and abs(blk.angle) < 15:
-#                 if len(current_blk.lines) > 1 or line_disance > font_size:
-#                     split = abs(lines[jj][0][1] - line[0][1]) > font_size
-#         if split:
-#             current_blk = copy.deepcopy(current_blk)
-#             current_blk.lines = [line]
-#             sub_blk_list.append(current_blk)
-#         else:
-#             current_blk.lines.append(line)
-#     if len(sub_blk_list) > 1:
-#         textblock_splitted = True
-#         for current_blk in sub_blk_list:
-#             current_blk.adjust_bbox(with_bbox=False)
-#     return textblock_splitted, sub_blk_list
-
-# def group_output(blks, lines, im_w, im_h, mask=None, sort_blklist=True) -> List[TextBlock]:
-#     blk_list: List[TextBlock] = []
-#     scattered_lines = {'ver': [], 'hor': []}
-#     for bbox, lang_id, conf in zip(*blks):
-#         # cls could give wrong result
-#         blk_list.append(TextBlock(bbox, language=LANG_LIST[lang_id]))
-
-#     # step1: filter & assign lines to textblocks
-#     bbox_score_thresh = 0.4
-#     mask_score_thresh = 0.1
-#     for line in lines:
-#         bx1, bx2 = line[:, 0].min(), line[:, 0].max()
-#         by1, by2 = line[:, 1].min(), line[:, 1].max()
-#         bbox_score, bbox_idx = -1, -1
-#         line_area = (by2-by1) * (bx2-bx1)
-#         for i, blk in enumerate(blk_list):
-#             score = union_area(blk.xyxy, [bx1, by1, bx2, by2]) / line_area
-#             if bbox_score < score:
-#                 bbox_score = score
-#                 bbox_idx = i
-#         if bbox_score > bbox_score_thresh:
-#             blk_list[bbox_idx].lines.append(line)
-#         else: # if no textblock was assigned, check whether there is "enough" textmask
-#             if mask is not None:
-#                 mask_score = mask[by1: by2, bx1: bx2].mean() / 255
-#                 if mask_score < mask_score_thresh:
-#                     continue
-#             blk = TextBlock([bx1, by1, bx2, by2], [line])
-#             examine_textblk(blk, im_w, im_h, sort=False)
-#             if blk.vertical:
-#                 scattered_lines['ver'].append(blk)
-#             else:
-#                 scattered_lines['hor'].append(blk)
-
-#     # step2: filter textblocks, sort & split textlines
-#     final_blk_list = []
-#     for blk in blk_list:
-#         # filter textblocks
-#         if len(blk.lines) == 0:
-#             bx1, by1, bx2, by2 = blk.xyxy
-#             if mask is not None:
-#                 mask_score = mask[by1: by2, bx1: bx2].mean() / 255
-#                 if mask_score < mask_score_thresh:
 #                     continue
 #             xywh = np.array([[bx1, by1, bx2-bx1, by2-by1]])
 #             blk.lines = xywh2xyxypoly(xywh).reshape(-1, 4, 2).tolist()
@@ -972,7 +881,7 @@ def rearrange_vertical_text_to_horizontal(
     logger.debug(f"Found {len(candidate_locations)} candidate locations for placement")
 
     # Process each vertical caption block
-    result_blocks = copy.deepcopy(horizontal_blocks)
+    result_blocks = horizontal_blocks.copy()
     for vcap_block in vertical_caption_blocks:
         # Change direction to horizontal
         vcap_block._direction = "h"
@@ -1007,13 +916,9 @@ def rearrange_vertical_text_to_horizontal(
             )
 
     # Return all blocks (both original horizontal and rearranged vertical)
-    result = result_blocks + [
+    return result_blocks + [
         blk for blk in vertical_caption_blocks if not blk.is_rearranged
     ]
-    
-    for blk in result:
-        blk.optimize_font_size()
-    return result
 
 
 def find_candidate_locations(
