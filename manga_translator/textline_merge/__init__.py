@@ -196,7 +196,7 @@ async def dispatch(textlines: List[Quadrilateral], width: int, height: int, verb
             total_logprobs += np.log(txtln.prob) * txtln.area
         total_logprobs /= sum([txtln.area for txtln in textlines])
 
-        font_size = int(np.mean([txtln.font_size for txtln in txtlns]))
+        font_size = int(min([txtln.font_size for txtln in txtlns]))
         angle = np.rad2deg(np.mean([txtln.angle for txtln in txtlns])) - 90
         if abs(angle) < 3:
             angle = 0
