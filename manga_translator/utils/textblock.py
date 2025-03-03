@@ -132,7 +132,11 @@ class TextBlock(object):
         self._is_rearranged = is_rearranged
 
     def __str__(self):
-        return f"TextBlock(text: {self.text[:3]}, angle: {self.angle}, direction: {self.direction}, alignment: {self.alignment})"
+        content = f"TextBlock(text: {self.translation[:3]}, angle: {self.angle}, direction: {self.direction}, alignment: {self.alignment},"
+        content = f"{content}\n xyxy: {self.xyxy}, xywh: {self.xywh}, center: {self.center}, aspect_ratio: {self.aspect_ratio},"
+        content = f"{content}\n area: {self.area}, real_area: {self.real_area}, polygon_aspect_ratio: {self.polygon_aspect_ratio},"
+        content = f"{content})"
+        return
 
     def __repr__(self):
         return self.__str__()
@@ -455,28 +459,35 @@ class TextBlock(object):
     def is_vertical_caption(self, img: np.ndarray) -> bool:
         """세로 쓰기 캡션 여부 (aspect ratio, 너비, 배경, 위치 기반으로 판단)"""
         if not (self.aspect_ratio < 0.7 and self.xywh[2] < 100):  # 기존 조건 유지
+            logger.debug(
+                f"Aspect ratio or width not satisfied for {self.translation[:3]}: {self.aspect_ratio}, {self.xywh[2]}"
+            )
             return False
 
         if img is not None:
             x1, y1, x2, y2 = self.xyxy
             region = img[y1:y2, x1:x2]
             if region.size == 0:  # 이미지 영역 벗어난 경우 방지
+                logger.debug(f"Region size is 0 for {self.translation[:3]}")
                 return False
             gray_region = cv2.cvtColor(region, cv2.COLOR_BGR2GRAY)
             bg_variance = np.var(gray_region)
             if bg_variance < 30:  # 배경 variance 임계값 (조정 가능)
+                logger.debug(
+                    f"Background variance not satisfied for {self.translation[:3]}: {bg_variance}"
+                )
                 return False  # 배경 variance가 낮으면 말풍선으로 간주
 
         # 위치 기반 조건 (상단에서 시작, 세로로 긴 형태)
-        image_height = (
-            img.shape[0] if img is not None else 500
-        )  # 이미지 높이, img 없을 시 기본값
-        if (
-            self.xyxy[1] < image_height * 0.3 and self.xywh[3] > 150
-        ):  # 상단 30% 영역, 높이 150px 이상 (임계값 조정 가능)
-            return True  # 위치 조건 만족 시 캡션으로 간주
+        image_height = img.shape[0] if img is not None else 500
+        if self.xyxy[1] >= image_height * 0.3:
+            logger.debug(
+                f"Location condition not satisfied for {self.translation[:3]}: {self.xyxy[1]} and image height is {image_height}"
+            )
+            return False  # 위치 조건 불만족 시 캡션 아님
 
-        return False  # 그 외는 캡션 아님
+        logger.debug(f"This is a vertical caption for{self.translation[:3]}: {self.xyxy[1]}, {self.aspect_ratio}")
+        return True  # 그 외는 세로 쓰기 캡션임
 
     @property
     def is_rearranged(self) -> bool:
@@ -876,7 +887,9 @@ def rearrange_vertical_text_to_horizontal(
 
     existing_block_bboxes = [block.xyxy.tolist() for block in horizontal_blocks]
     vertical_caption_blocks.sort(key=lambda block: block.xyxy[0], reverse=True)
-    ranked_regions = find_best_background_regions(img, num_regions=len(vertical_caption_blocks))
+    ranked_regions = find_best_background_regions(
+        img, num_regions=len(vertical_caption_blocks)
+    )
 
     rearranged_blocks: List[TextBlock] = []
     spacing = 20
