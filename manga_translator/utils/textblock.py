@@ -1065,41 +1065,57 @@ def find_best_placement(
     orig_x, orig_y = block.center
     original_width, original_height = block.unrotated_size
     
-    # Calculate the original area - we want to preserve this
+    # Calculate the original area - we'll preserve this
     original_area = original_width * original_height
     
-    # Calculate horizontal aspect ratio (typically horizontal text is wider than tall)
-    # For Japanese/Korean vertical text converted to horizontal, 4:1 to 5:1 is common
-    horizontal_aspect_ratio = 4.0  # width:height ratio
-    
-    # Calculate dimensions that maintain the same area but with horizontal orientation
-    # Formula: width * height = original_area and width/height = aspect_ratio
-    # Therefore: width = sqrt(original_area * aspect_ratio) and height = width / aspect_ratio
-    
-    # Calculate new width and height preserving the area
-    block_width = int(np.sqrt(original_area * horizontal_aspect_ratio))
-    block_height = int(original_area / block_width)
-    
-    # Adjust based on text length if provided (optional)
+    # Step 1: Calculate new width based on text length and other factors
     if text_length > 0:
-        char_width_estimate = max(12, min(20, original_width / 2))
-        text_based_width = text_length * char_width_estimate
-        if text_based_width > block_width * 0.7 and text_based_width < block_width * 1.5:
-            adjusted_width = text_based_width
-            adjusted_height = original_area / adjusted_width
-            block_width = int(adjusted_width)
-            block_height = int(adjusted_height)
-            
-    # Increase the minimum height: ensure the new height isn’t too small compared to the original block height.
-    block_height = max(block_height, int(original_height * 0.8))
+        # Use text length to estimate width
+        char_width = 15  # Pixels per character (adjustable)
+        new_width = text_length * char_width
+        
+        # Ensure it's not too small or too large
+        new_width = max(new_width, original_width * 0.8)
+        new_width = min(new_width, img.shape[1] * 0.8)  # Don't exceed 80% of image width
+    else:
+        # If no text length info, estimate based on vertical caption characteristics
+        # Vertical captions typically have small width and large height
+        # When converted to horizontal, they should be wider and less tall
+        new_width = original_height * 1.2  # Use height as a basis for new width
     
-    # Clamp dimensions so they fit into the image:
-    block_width = max(block_width, 60)
-    block_width = min(block_width, img.shape[1] - 20)
-    block_height = max(block_height, 40)  # Increased minimum height from 20 to 40
-    block_height = min(block_height, 80)  # Limit height to prevent overly tall blocks
-
-    logger.debug(f"Original dimensions: {original_width}x{original_height}, New dimensions: {block_width}x{block_height}")
+    # Step 2: Calculate height to preserve original area
+    new_height = original_area / new_width
+    
+    # Apply reasonable constraints
+    new_width = int(max(new_width, 80))  # Minimum width
+    new_width = int(min(new_width, img.shape[1] - 20))  # Maximum width
+    
+    new_height = int(max(new_height, 20))  # Minimum height
+    new_height = int(min(new_height, 100, img.shape[0] * 0.2))  # Maximum height
+    
+    # Recalculate to ensure area preservation after constraints
+    adjusted_area = new_width * new_height
+    area_ratio = original_area / adjusted_area
+    
+    # If area changed significantly due to constraints, adjust as needed
+    if 0.8 <= area_ratio <= 1.25:
+        # Area is reasonably preserved, no need to adjust further
+        block_width, block_height = new_width, new_height
+    else:
+        # Area changed too much, recalculate one dimension
+        if area_ratio > 1:  # New area is smaller than original
+            # Increase height to compensate (width is often more important)
+            block_width = new_width
+            block_height = int(original_area / block_width)
+            block_height = min(block_height, 100, img.shape[0] * 0.2)  # Apply max limit again
+        else:  # New area is larger than original
+            # Adjust width to match original area
+            block_height = new_height
+            block_width = int(original_area / block_height)
+            block_width = min(block_width, img.shape[1] - 20)  # Apply max limit again
+    
+    logger.debug(f"Original dimensions: {original_width}x{original_height}, area: {original_area}")
+    logger.debug(f"New dimensions: {block_width}x{block_height}, area: {block_width*block_height}")
 
     # Score each candidate location
     best_score = float("inf")
@@ -1194,6 +1210,7 @@ def find_best_placement(
         # Last resort: adjust width and try again with minimal width
         min_width = min(block_width, 200)
         min_height = int(original_area / min_width)  # Maintain area
+        min_height = min(min_height, 100)  # Cap the height
         min_rect = (10, 10, 10 + min_width, 10 + min_height)
         return min_rect
 
