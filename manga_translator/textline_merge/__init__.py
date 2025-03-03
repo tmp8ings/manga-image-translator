@@ -202,7 +202,7 @@ async def dispatch(textlines: List[Quadrilateral], width: int, height: int, verb
         total_logprobs /= sum([txtln.area for txtln in textlines])
 
         font_size = int(min([txtln.font_size for txtln in txtlns]))
-        max_font_size = max([txtln.font_size for txtln in txtlns])
+        max_font_size = int(max([txtln.font_size for txtln in txtlns]))
         logger.debug(f"font size at textline merge: {font_size}. with max: {max_font_size}")
         angle = np.rad2deg(np.mean([txtln.angle for txtln in txtlns])) - 90
         if abs(angle) < 3:
