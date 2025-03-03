@@ -516,6 +516,7 @@ class TextBlock(object):
             int: The optimized font size
         """
         # Get box dimensions
+        original_font_size = self.font_size
         width, height = self.unrotated_size
         box_area = width * height
         
@@ -553,7 +554,8 @@ class TextBlock(object):
             # Round to integer
             self.font_size = int(round(calculated_font_size))
             
-            logger.debug(f"Optimized font size for '{text[:10]}...': {self.font_size} (w:{width}, h:{height})")
+            logger.debug(f"text: {text}")
+            logger.debug(f"Optimized font size for '{text[:4]}': {original_font_size} -> {self.font_size}. (w:{width}, h:{height}, len: {text_length})")
             return self.font_size
             
         # Fallback calculation for cases not covered above
