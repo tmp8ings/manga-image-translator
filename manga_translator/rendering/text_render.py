@@ -10,6 +10,8 @@ from hyphen import Hyphenator
 from hyphen.dictools import LANGUAGES as HYPHENATOR_LANGUAGES
 from langcodes import standardize_tag
 
+from manga_translator.utils.log import get_logger
+
 from ..utils import BASE_PATH, is_punctuation, is_whitespace
 
 try:
@@ -17,6 +19,8 @@ try:
     HYPHENATOR_LANGUAGES.append('fr_FR')
 except Exception:
     pass
+
+logger = get_logger('render')
 
 CJK_H2V = {
     "‥": "︰",
@@ -680,6 +684,7 @@ def put_char_horizontal(font_size: int, cdpt: str, pen_l: Tuple[int, int], canva
 def put_text_horizontal(font_size: int, text: str, width: int, height: int, alignment: str,
                         reversed_direction: bool, fg: Tuple[int, int, int], bg: Tuple[int, int, int],
                         lang: str = 'en_US', hyphenate: bool = True, line_spacing: int = 0):
+    logger.debug(f"put_text_horizontal: {font_size}, {text}, {width}, {height}, {alignment}, {reversed_direction}, {fg}, {bg}, {lang}, {hyphenate}, {line_spacing}")
     text = compact_special_symbols(text)
     if not text :
         return
