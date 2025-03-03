@@ -46,41 +46,82 @@ def resize_regions_to_font_size(
     font_size_offset: int,
     font_size_minimum: int,
 ):
-    if True or font_size_minimum == -1:
-        # Automatically determine font_size by image size
-        font_size_minimum = round((img.shape[0] + img.shape[1]) / 200)
+    """
+    더 향상된 폰트 크기 계산 함수
+    텍스트 길이, 텍스트박스 크기, 이미지 크기를 고려하여 최적의 폰트 크기 결정
+    """
+    # 이미지 크기에 따른 기본 최소 폰트 크기 계산 (더 큰 값으로 설정)
+    if font_size_minimum == -1 or True:  # 항상 자동 계산 적용
+        # 이미지 크기에 따른 최소 폰트 크기 계산식 개선
+        img_size_factor = (img.shape[0] + img.shape[1]) / 150  # 분모를 작게 하여 기본 크기 증가
+        font_size_minimum = max(round(img_size_factor), 18)  # 최소 18 이상
+    
     logger.debug(f"font_size_minimum {font_size_minimum}")
+    
+    # 글로벌 폰트 스케일 팩터 (전체적인 폰트 크기 증가)
+    global_scale_factor = 1.3  # 30% 증가
 
     dst_points_list = []
     for region in text_regions:
-        char_count_orig = len(region.text)
-        char_count_trans = len(region.translation.strip())
-        if char_count_trans > char_count_orig:
-            # More characters were added, have to reduce fontsize to fit allotted area
-            # print('count', char_count_trans, region.font_size)
-            rescaled_font_size = region.font_size
-            while True:
-                rows = region.unrotated_size[0] // rescaled_font_size
-                cols = region.unrotated_size[1] // rescaled_font_size
-                if rows * cols >= char_count_trans:
-                    # print(rows, cols, rescaled_font_size, rows * cols, char_count_trans)
-                    # print('rescaled', rescaled_font_size)
-                    region.font_size = rescaled_font_size
-                    break
-                rescaled_font_size -= 1
-                if rescaled_font_size <= 0:
-                    break
-        # Otherwise no need to increase fontsize
-
-        # Infer the target fontsize
+        char_count_orig = len(region.text) if region.text else 1
+        char_count_trans = len(region.translation.strip()) if region.translation else 1
+        
+        # 텍스트 박스 면적 계산
+        box_area = region.unrotated_size[0] * region.unrotated_size[1]
+        
+        # 글자당 이상적인 면적 계산 (더 넓게 설정)
+        ideal_area_per_char = box_area / char_count_orig * 1.2
+        
+        # 번역 텍스트를 위한 이상적인 폰트 크기 계산
+        ideal_font_size = (ideal_area_per_char / 2)**0.5  # 제곱근으로 면적->길이 변환
+        
+        # 텍스트 길이와 원본 폰트 크기 관계 고려
         target_font_size = region.font_size
+        
+        # 번역된 텍스트가 원본보다 많으면 폰트 크기 조정
+        if char_count_trans > char_count_orig:
+            compression_ratio = (char_count_orig / char_count_trans) ** 0.5  # 제곱근으로 완화된 비율
+            target_font_size = max(
+                region.font_size * compression_ratio,
+                font_size_minimum
+            )
+        else:
+            # 번역 텍스트가 짧으면 폰트 크기를 키움
+            expansion_ratio = min(1.5, (char_count_orig / char_count_trans) ** 0.5)
+            target_font_size = region.font_size * expansion_ratio
+            
+            # 짧은 텍스트 (1-5 글자)는 박스를 더 크게 채워도 좋음
+            if char_count_trans <= 5:
+                target_font_size *= 1.2
+        
+        # 계산된 이상적인 폰트 크기와 비교하여 조정
+        target_font_size = max(target_font_size, ideal_font_size, font_size_minimum)
+        
+        # 고정 폰트 크기가 설정되어 있는 경우
         if font_size_fixed is not None:
             target_font_size = font_size_fixed
+        # 아니면 최소값과 비교
         elif target_font_size < font_size_minimum:
-            target_font_size = max(region.font_size, font_size_minimum)
-        target_font_size += font_size_offset
+            target_font_size = font_size_minimum
+            
+        # 오프셋 적용 및 글로벌 스케일 적용
+        target_font_size = target_font_size * global_scale_factor + font_size_offset
+        
+        # 텍스트 박스 크기 제한 (너무 큰 폰트로 텍스트박스를 넘어가지 않도록)
+        # 가로 방향 텍스트이면 높이의 절반을 넘지 않도록, 세로면 너비의 절반을 넘지 않도록
+        if region.horizontal:
+            max_font_size = region.unrotated_size[1] / 2
+        else:
+            max_font_size = region.unrotated_size[0] / 2
+            
+        target_font_size = min(target_font_size, max_font_size)
+        
+        # 정수로 변환
+        target_font_size = int(round(target_font_size))
+        
+        logger.debug(f"Region: '{region.translation[:10]}...', Original size: {region.font_size}, Target size: {target_font_size}")
 
-        # Rescale dst_points accordingly
+        # 폰트 크기가 변경되었으면 점 위치 조정
         if target_font_size != region.font_size:
             target_scale = target_font_size / region.font_size
             dst_points = region.unrotated_min_rect[0]
@@ -96,7 +137,7 @@ def resize_regions_to_font_size(
             dst_points[..., 1] = dst_points[..., 1].clip(0, img.shape[0])
 
             dst_points = dst_points.reshape((-1, 4, 2))
-            region.font_size = int(target_font_size)
+            region.font_size = target_font_size
         else:
             dst_points = region.min_rect
 
