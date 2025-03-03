@@ -848,90 +848,254 @@ def visualize_textblocks(canvas: np.ndarray, blk_list: List[TextBlock]):
 
 # find_best_background_regions, check_overlap, rearrange_vertical_text_to_horizontal 함수는 이전 답변과 동일하게 사용합니다.
 def find_best_background_regions(
-    img: np.ndarray, grid_size: int = 50, num_regions: int = 5
-) -> List[Tuple[Tuple[int, int], float]]:
+    img: np.ndarray, grid_size: int = 50, min_width: int = 100, min_height: int = 50, num_regions: int = 10
+) -> List[Tuple[Tuple[int, int, int, int], float]]:
+    """
+    Find regions with minimal background variance that are large enough for text placement.
+    
+    Args:
+        img: Input image
+        grid_size: Size of grid cells for initial evaluation
+        min_width: Minimum width required for a region
+        min_height: Minimum height required for a region
+        num_regions: Number of best regions to return
+    
+    Returns:
+        List of tuples containing ((x, y, width, height), variance)
+    """
     h, w = img.shape[:2]
-    regions_variance = []
+    regions_info = []
 
-    for y in range(0, h - grid_size, grid_size):
-        for x in range(0, w - grid_size, grid_size):
-            region = img[y : y + grid_size, x : x + grid_size]
-            gray_region = cv2.cvtColor(region, cv2.COLOR_BGR2GRAY)
-            variance = np.var(gray_region)
-            regions_variance.append(((x, y), variance))
+    # Scan the image with overlapping regions
+    step_size = grid_size // 2
+    for y in range(0, h - min_height, step_size):
+        for x in range(0, w - min_width, step_size):
+            # Try different sized regions
+            for width in range(min_width, min(w - x, grid_size * 3), grid_size):
+                for height in range(min_height, min(h - y, grid_size * 2), grid_size):
+                    region = img[y:y + height, x:x + width]
+                    gray_region = cv2.cvtColor(region, cv2.COLOR_BGR2GRAY)
+                    
+                    # Calculate variance as a measure of background uniformity
+                    variance = np.var(gray_region)
+                    
+                    # Calculate edge density
+                    edges = cv2.Canny(gray_region, 50, 150)
+                    edge_density = np.sum(edges > 0) / (width * height)
+                    
+                    # Combined score (lower is better)
+                    combined_score = variance + edge_density * 1000
+                    
+                    regions_info.append(((x, y, width, height), combined_score))
 
-    regions_variance.sort(key=lambda item: item[1])
-    return regions_variance[:num_regions]
-
+    # Sort regions by score (lower is better)
+    regions_info.sort(key=lambda item: item[1])
+    return regions_info[:num_regions]
 
 def check_overlap(
-    bbox1: Tuple[int, int, int, int], bbox_list: List[Tuple[int, int, int, int]]
+    bbox1: Tuple[int, int, int, int], bbox_list: List[Tuple[int, int, int, int]], margin: int = 5
 ) -> bool:
+    """
+    Check if a bounding box overlaps with any bounding box in a list.
+    Includes a margin to avoid text being too close to each other.
+    
+    Args:
+        bbox1: Bounding box to check (x1, y1, x2, y2)
+        bbox_list: List of bounding boxes to check against
+        margin: Extra margin to add around boxes for spacing
+    
+    Returns:
+        True if overlap detected, False otherwise
+    """
     x1_1, y1_1, x2_1, y2_1 = bbox1
+    # Add margin
+    x1_1 -= margin
+    y1_1 -= margin
+    x2_1 += margin
+    y2_1 += margin
+    
     for bbox2 in bbox_list:
         x1_2, y1_2, x2_2, y2_2 = bbox2
         if not (x2_1 < x1_2 or x2_2 < x1_1 or y2_1 < y1_2 or y2_2 < y1_1):
             return True
     return False
 
-
 def rearrange_vertical_text_to_horizontal(
     text_blocks: List[TextBlock], img: np.ndarray
 ) -> List[TextBlock]:
+    """
+    Rearrange vertical text blocks to horizontal orientation with improved placement.
+    
+    Args:
+        text_blocks: List of text blocks
+        img: Input image
+    
+    Returns:
+        List of all text blocks with vertical caption blocks rearranged
+    """
     vertical_caption_blocks: List[TextBlock] = []
     horizontal_blocks: List[TextBlock] = []
+    img_height, img_width = img.shape[:2]
 
+    # Separate vertical captions from horizontal blocks
     for block in text_blocks:
         if block.is_vertical_caption(img):
             vertical_caption_blocks.append(block)
         else:
             horizontal_blocks.append(block)
-
+    
+    # If no vertical captions, return original blocks
+    if not vertical_caption_blocks:
+        return text_blocks
+    
+    # Get information about text blocks for better placement
+    max_block_width = max([block.xywh[2] for block in vertical_caption_blocks], default=100)
+    max_block_height = max([block.xywh[3] for block in vertical_caption_blocks], default=50)
+    total_width_needed = sum([block.xywh[2] for block in vertical_caption_blocks]) + 20 * (len(vertical_caption_blocks) - 1)
+    
+    # Get existing block bboxes to avoid overlapping
     existing_block_bboxes = [block.xyxy.tolist() for block in horizontal_blocks]
-    vertical_caption_blocks.sort(key=lambda block: block.xyxy[0], reverse=True)
+    
+    # Find regions based on appropriate size estimates
+    grid_size = max(50, max_block_height // 2)
+    min_width = min(total_width_needed, max_block_width * 2)
+    min_height = max_block_height + 20
     ranked_regions = find_best_background_regions(
-        img, num_regions=len(vertical_caption_blocks)
+        img, grid_size=grid_size, min_width=min_width, 
+        min_height=min_height, num_regions=15
     )
+    
+    # Sort vertical blocks by priority (e.g., length or position)
+    vertical_caption_blocks.sort(key=lambda block: block.xyxy[0], reverse=True)
 
     rearranged_blocks: List[TextBlock] = []
-    spacing = 20
-    y_position_offset = 10
-    current_x_offset = 10
-    placed_in_region = False
-
+    spacing = 20  # Space between blocks
+    placement_found = False
+    
+    # Try different placement strategies
+    placement_strategies = [
+        # Top of image
+        {'y_start': 10, 'x_start': 10, 'direction': 'horizontal'},
+        # Bottom of image
+        {'y_start': img_height - max_block_height - 10, 'x_start': 10, 'direction': 'horizontal'},
+        # Left side of image (vertical stack)
+        {'y_start': 10, 'x_start': 10, 'direction': 'vertical'},
+        # Right side of image (vertical stack)
+        {'y_start': 10, 'x_start': img_width - max_block_width - 10, 'direction': 'vertical'}
+    ]
+    
+    # First try regions with low variance
     for region_info in ranked_regions:
-        region_coords, _ = region_info
-        region_x, region_y = region_coords
-        current_x = region_x + current_x_offset
-        y_position = region_y + y_position_offset
+        region_bbox, _ = region_info
+        region_x, region_y, region_width, region_height = region_bbox
+        
+        # Check if region is large enough for all blocks
+        if region_width < total_width_needed and region_width < img_width // 2:
+            continue
+            
+        current_x = region_x + 10  # Add some padding
+        current_y = region_y + 10
         temp_rearranged_blocks: List[TextBlock] = []
         overlap_detected = False
-
+        
+        # Try to fit all blocks in this region
         for block in vertical_caption_blocks:
             block_width = block.xywh[2]
             block_height = block.xywh[3]
+            
+            # Ensure block doesn't go outside image boundaries
+            if current_x + block_width > img_width - 10 or current_y + block_height > img_height - 10:
+                overlap_detected = True
+                break
+                
             proposed_bbox = (
                 current_x,
-                y_position,
+                current_y,
                 current_x + block_width,
-                y_position + block_height,
+                current_y + block_height,
             )
-
+            
+            # Check if proposed location overlaps with existing blocks
             if check_overlap(
                 proposed_bbox,
-                existing_block_bboxes
-                + [b.xyxy.tolist() for b in temp_rearranged_blocks],
+                existing_block_bboxes + [b.xyxy.tolist() for b in temp_rearranged_blocks],
+                margin=10
             ):
                 overlap_detected = True
                 break
-            else:
-                # 수정된 부분: new_lines를 올바른 포맷으로 구성
+                
+            # Create new block with horizontal orientation
+            new_lines = np.array([
+                [
+                    [current_x, current_y],
+                    [current_x + block_width, current_y],
+                    [current_x + block_width, current_y + block_height],
+                    [current_x, current_y + block_height],
+                ]
+            ], dtype=np.int32)
+            
+            new_block = copy.deepcopy(block)
+            new_block.lines = new_lines
+            new_block._direction = "h"
+            new_block.is_rearranged = True
+            temp_rearranged_blocks.append(new_block)
+            
+            # Update position for next block (in reading order)
+            current_x += block_width + spacing
+            
+            # If we're reaching the end of the region width, wrap to next line
+            if current_x + max_block_width > region_x + region_width:
+                current_x = region_x + 10
+                current_y += max_block_height + 10
+                
+                # Check if we have enough height for another row
+                if current_y + max_block_height > region_y + region_height:
+                    overlap_detected = True
+                    break
+        
+        if not overlap_detected:
+            rearranged_blocks = temp_rearranged_blocks
+            placement_found = True
+            break
+    
+    # If no region works, try placement strategies
+    if not placement_found:
+        for strategy in placement_strategies:
+            current_x = strategy['x_start']
+            current_y = strategy['y_start']
+            temp_rearranged_blocks = []
+            overlap_detected = False
+            
+            for block in vertical_caption_blocks:
+                block_width = block.xywh[2]
+                block_height = block.xywh[3]
+                
+                proposed_bbox = (
+                    current_x,
+                    current_y,
+                    current_x + block_width,
+                    current_y + block_height,
+                )
+                
+                # Check boundaries and overlaps
+                if (current_x < 0 or current_y < 0 or 
+                    current_x + block_width > img_width or 
+                    current_y + block_height > img_height or
+                    check_overlap(
+                        proposed_bbox,
+                        existing_block_bboxes + [b.xyxy.tolist() for b in temp_rearranged_blocks],
+                        margin=10
+                    )):
+                    overlap_detected = True
+                    break
+                
+                # Create new block
                 new_lines = np.array([
                     [
-                        [current_x, y_position],  # top-left
-                        [current_x + block_width, y_position],  # top-right
-                        [current_x + block_width, y_position + block_height],  # bottom-right
-                        [current_x, y_position + block_height],  # bottom-left
+                        [current_x, current_y],
+                        [current_x + block_width, current_y],
+                        [current_x + block_width, current_y + block_height],
+                        [current_x, current_y + block_height],
                     ]
                 ], dtype=np.int32)
                 
@@ -940,30 +1104,42 @@ def rearrange_vertical_text_to_horizontal(
                 new_block._direction = "h"
                 new_block.is_rearranged = True
                 temp_rearranged_blocks.append(new_block)
-                current_x += block_width + spacing
-
-        if not overlap_detected:
-            rearranged_blocks = temp_rearranged_blocks
-            placed_in_region = True
-            break
-
-    if not placed_in_region:
-        print(
-            "Warning: Could not find non-overlapping simple background region. Using default placement."
-        )
+                
+                # Update position based on layout direction
+                if strategy['direction'] == 'horizontal':
+                    current_x += block_width + spacing
+                else:  # vertical
+                    current_y += block_height + spacing
+            
+            if not overlap_detected:
+                rearranged_blocks = temp_rearranged_blocks
+                placement_found = True
+                break
+    
+    # Last resort: place blocks in a simple layout if all strategies failed
+    if not placement_found:
+        logger.warning("Could not find optimal placement. Using fallback layout.")
         current_x = 10
-        y_position = 50
+        current_y = 10
+        rearranged_blocks = []
+        
+        # Calculate layout for all blocks together
         for block in vertical_caption_blocks:
             block_width = block.xywh[2]
             block_height = block.xywh[3]
             
-            # 수정된 부분: new_lines를 올바른 포맷으로 구성
+            # Wrap to next line if needed
+            if current_x + block_width > img_width - 10:
+                current_x = 10
+                current_y += max_block_height + 10
+            
+            # Create new block
             new_lines = np.array([
                 [
-                    [current_x, y_position],  # top-left
-                    [current_x + block_width, y_position],  # top-right
-                    [current_x + block_width, y_position + block_height],  # bottom-right
-                    [current_x, y_position + block_height],  # bottom-left
+                    [current_x, current_y],
+                    [current_x + block_width, current_y],
+                    [current_x + block_width, current_y + block_height],
+                    [current_x, current_y + block_height],
                 ]
             ], dtype=np.int32)
             
@@ -972,6 +1148,7 @@ def rearrange_vertical_text_to_horizontal(
             new_block._direction = "h"
             new_block.is_rearranged = True
             rearranged_blocks.append(new_block)
+            
             current_x += block_width + spacing
-
+    
     return rearranged_blocks + horizontal_blocks
