@@ -141,7 +141,7 @@ class TextBlock(object):
     def __repr__(self):
         return self.__str__()
 
-    @cached_property
+    @property
     def xyxy(self):
         """Coordinates of the bounding box"""
         x1 = self.lines[..., 0].min()
@@ -150,24 +150,24 @@ class TextBlock(object):
         y2 = self.lines[..., 1].max()
         return np.array([x1, y1, x2, y2]).astype(np.int32)
 
-    @cached_property
+    @property
     def xywh(self):
         x1, y1, x2, y2 = self.xyxy
         return np.array([x1, y1, x2 - x1, y2 - y1]).astype(np.int32)
 
-    @cached_property
+    @property
     def center(self) -> np.ndarray:
         xyxy = np.array(self.xyxy)
         return (xyxy[:2] + xyxy[2:]) / 2
 
-    @cached_property
+    @property
     def unrotated_polygons(self) -> np.ndarray:
         polygons = self.lines.reshape(-1, 8)
         if self.angle != 0:
             polygons = rotate_polygons(self.center, polygons, self.angle)
         return polygons
 
-    @cached_property
+    @property
     def unrotated_min_rect(self) -> np.ndarray:
         polygons = self.unrotated_polygons
         min_x = polygons[:, ::2].min()
@@ -177,7 +177,7 @@ class TextBlock(object):
         min_bbox = np.array([[min_x, min_y, max_x, min_y, max_x, max_y, min_x, max_y]])
         return min_bbox.reshape(-1, 4, 2).astype(np.int64)
 
-    @cached_property
+    @property
     def min_rect(self) -> np.ndarray:
         polygons = self.unrotated_polygons
         min_x = polygons[:, ::2].min()
@@ -189,7 +189,7 @@ class TextBlock(object):
             min_bbox = rotate_polygons(self.center, min_bbox, -self.angle)
         return min_bbox.clip(0).reshape(-1, 4, 2).astype(np.int64)
 
-    @cached_property
+    @property
     def polygon_aspect_ratio(self) -> float:
         """width / height"""
         polygons = self.unrotated_polygons.reshape(-1, 4, 2)
@@ -198,7 +198,7 @@ class TextBlock(object):
         norm_h = np.linalg.norm(middle_pts[:, 1] - middle_pts[:, 3], axis=1)
         return np.mean(norm_h / norm_v)
 
-    @cached_property
+    @property
     def unrotated_size(self) -> Tuple[int, int]:
         """Returns width and height of unrotated bbox"""
         middle_pts = (self.min_rect[:, [1, 2, 3, 0]] + self.min_rect) / 2
@@ -206,7 +206,7 @@ class TextBlock(object):
         norm_v = np.linalg.norm(middle_pts[:, 2] - middle_pts[:, 0])
         return norm_h, norm_v
 
-    @cached_property
+    @property
     def aspect_ratio(self) -> float:
         """width / height"""
         return self.unrotated_size[0] / self.unrotated_size[1]
