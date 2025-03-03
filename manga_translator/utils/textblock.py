@@ -503,6 +503,78 @@ class TextBlock(object):
         """재배치 여부 설정 속성"""
         self._is_rearranged = value
 
+    def optimize_font_size(self, min_size=8, max_size=60, target_fill_ratio=0.7):
+        """
+        Optimize font size based on text box dimensions, text content and length.
+        
+        Args:
+            min_size (int): Minimum font size to allow
+            max_size (int): Maximum font size to allow
+            target_fill_ratio (float): Target ratio of text area to box area (0.0-1.0)
+            
+        Returns:
+            int: Optimized font size
+        """
+        # Get text to use for calculation (translation if available, otherwise original text)
+        text = self.translation if self.translation else self.text
+        if not text:
+            return self.font_size  # Keep current size if no text
+            
+        # Get box dimensions
+        if self.vertical or self.direction.startswith('v'):
+            box_width, box_height = self.unrotated_size
+            is_vertical = True
+        else:
+            box_width, box_height = self.unrotated_size
+            is_vertical = False
+            
+        # Calculate area available for text
+        box_area = box_width * box_height
+        
+        # Get character count
+        char_count = len(text)
+        
+        # Calculate base size based on box dimensions and text length
+        if is_vertical:
+            # For vertical text, height is divided by character count
+            base_size = min(box_height / (char_count * 1.2), box_width * 0.95)
+        else:
+            # For horizontal text, width is the main constraint
+            # Estimate average characters per line based on box aspect ratio
+            estimated_lines = max(1, min(5, round(box_height / (box_width * 0.5))))
+            chars_per_line = char_count / estimated_lines
+            base_size = min(box_width / (chars_per_line * 0.6), box_height / (estimated_lines * 1.4))
+        
+        # Adjust for text content
+        # CJK characters need more space
+        has_cjk = any('\u3000' <= c <= '\u9fff' for c in text)
+        if has_cjk:
+            base_size *= 0.85  # CJK characters need more space
+            
+        # Adjust for punctuation density
+        punctuation_count = sum(1 for c in text if c in '.,!?;:()[]{}"\'')
+        if punctuation_count > char_count * 0.1:
+            base_size *= 1.1  # Text with lots of punctuation can be sized larger
+        
+        # Consider text density and fill ratio
+        if char_count > 100:  # Long text
+            base_size *= 0.9
+        elif char_count < 20:  # Short text
+            base_size *= 1.2
+            
+        # Scale by target fill ratio
+        base_size *= target_fill_ratio
+        
+        # Apply min/max constraints and round to integer
+        optimized_size = max(min_size, min(max_size, round(base_size)))
+        
+        logger.debug(f"Optimized font size: {self.font_size} -> {optimized_size} for text: {text[:20]}...")
+        
+        # Update font size
+        self.font_size = optimized_size
+        
+        return optimized_size
+
 
 def rotate_polygons(center, polygons, rotation, new_center=None, to_int=True):
     if rotation == 0:
@@ -900,7 +972,7 @@ def rearrange_vertical_text_to_horizontal(
     logger.debug(f"Found {len(candidate_locations)} candidate locations for placement")
 
     # Process each vertical caption block
-    result_blocks = horizontal_blocks.copy()
+    result_blocks = copy.deepcopy(horizontal_blocks)
     for vcap_block in vertical_caption_blocks:
         # Change direction to horizontal
         vcap_block._direction = "h"
@@ -935,9 +1007,13 @@ def rearrange_vertical_text_to_horizontal(
             )
 
     # Return all blocks (both original horizontal and rearranged vertical)
-    return result_blocks + [
+    result = result_blocks + [
         blk for blk in vertical_caption_blocks if not blk.is_rearranged
     ]
+    
+    for blk in result:
+        blk.optimize_font_size()
+    return result
 
 
 def find_candidate_locations(
