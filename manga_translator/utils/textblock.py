@@ -458,7 +458,7 @@ class TextBlock(object):
 
     def is_vertical_caption(self, img: np.ndarray) -> bool:
         """세로 쓰기 캡션 여부 (aspect ratio, 너비, 배경, 위치 기반으로 판단)"""
-        if not (self.aspect_ratio < 0.7 and self.xywh[2] < 100):  # 기존 조건 유지
+        if not (self.aspect_ratio < 0.7):  # 기존 조건 유지
             logger.debug(
                 f"Aspect ratio or width not satisfied for {self.translation[:3]}: {self.aspect_ratio}, {self.xywh[2]}"
             )
