@@ -109,13 +109,13 @@ async def dispatch(
     text_render.set_font(font_path)
     text_regions = list(filter(lambda region: region.translation, text_regions))
     
-    log_text = "\n".join(text_regions)
+    log_text = "\n".join([str(i) for i in text_regions])
     logger.debug(f'text_regions before rearrange: {log_text}')
     try:
         text_regions = rearrange_vertical_text_to_horizontal(text_regions, img)
     except Exception as e:
         logger.error(f'Error while rearranging text: {e}', exc_info=True)
-    log_text = "\n".join(text_regions)
+    log_text = "\n".join([str(i) for i in text_regions])
     logger.debug(f'text_regions after rearrange: {log_text}')
 
     # Resize regions that are too small
