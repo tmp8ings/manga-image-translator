@@ -938,7 +938,7 @@ def rearrange_vertical_text_to_horizontal(
                 # --- Modified new TextBlock creation using a deep copy for robustness ---
                 new_block = copy.deepcopy(block)
                 new_block.lines = new_lines
-                new_block.direction = "h"
+                new_block._direction = "h"
                 new_block.is_rearranged = True
                 # --- End modification ---
                 temp_rearranged_blocks.append(new_block)
@@ -973,7 +973,7 @@ def rearrange_vertical_text_to_horizontal(
             # --- Modified default new TextBlock creation using a deep copy ---
             new_block = copy.deepcopy(block)
             new_block.lines = new_lines
-            new_block.direction = "h"
+            new_block._direction = "h"
             new_block.is_rearranged = True
             # --- End modification ---
             rearranged_blocks.append(new_block)
