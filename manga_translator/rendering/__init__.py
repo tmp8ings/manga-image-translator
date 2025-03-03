@@ -154,7 +154,7 @@ def render(
     norm_v = np.linalg.norm(middle_pts[:, 2] - middle_pts[:, 0], axis=1)
     r_orig = np.mean(norm_h / norm_v)
 
-    logger.debug(f'norm_h {norm_h}, norm_v {norm_v}, r_orig {r_orig}, region {region}')
+    logger.debug(f'norm_h {norm_h}, norm_v {norm_v}, r_orig {r_orig}, region {region}:{region.horizontal}')
     if region.horizontal:
         temp_box = text_render.put_text_horizontal(
             region.font_size,
