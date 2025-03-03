@@ -5,7 +5,12 @@ from collections import Counter
 import networkx as nx
 from shapely.geometry import Polygon
 
+from manga_translator.utils.log import get_logger
+
 from ..utils import TextBlock, Quadrilateral, quadrilateral_can_merge_region
+
+
+logger = get_logger("textline_merge")
 
 def split_text_region(
         bboxes: List[Quadrilateral],
@@ -197,6 +202,8 @@ async def dispatch(textlines: List[Quadrilateral], width: int, height: int, verb
         total_logprobs /= sum([txtln.area for txtln in textlines])
 
         font_size = int(min([txtln.font_size for txtln in txtlns]))
+        max_font_size = max([txtln.font_size for txtln in txtlns])
+        logger.debug(f"font size at textline merge: {font_size}. with max: {max_font_size}")
         angle = np.rad2deg(np.mean([txtln.angle for txtln in txtlns])) - 90
         if abs(angle) < 3:
             angle = 0
