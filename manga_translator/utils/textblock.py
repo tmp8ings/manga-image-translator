@@ -935,9 +935,8 @@ def rearrange_vertical_text_to_horizontal(
                         y_position + block_height,
                     )
                 ]
-                # --- Modified new TextBlock creation using a deep copy for robustness ---
                 new_block = copy.deepcopy(block)
-                new_block.lines = new_lines
+                new_block.lines = np.array(new_lines, dtype=np.int32)
                 new_block._direction = "h"
                 new_block.is_rearranged = True
                 # --- End modification ---
@@ -970,9 +969,8 @@ def rearrange_vertical_text_to_horizontal(
                     y_position + block_height,
                 )
             ]
-            # --- Modified default new TextBlock creation using a deep copy ---
             new_block = copy.deepcopy(block)
-            new_block.lines = new_lines
+            new_block.lines = np.array(new_lines, dtype=np.int32)
             new_block._direction = "h"
             new_block.is_rearranged = True
             # --- End modification ---
