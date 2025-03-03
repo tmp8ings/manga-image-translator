@@ -935,20 +935,12 @@ def rearrange_vertical_text_to_horizontal(
                         y_position + block_height,
                     )
                 ]
-                new_block = TextBlock(
-                    lines=new_lines,
-                    texts=[block.text],
-                    language=block.language,
-                    font_size=block.font_size,
-                    fg_color=block.fg_colors,
-                    bg_color=block.bg_colors,
-                    font_family=block.font_family,
-                    bold=block.bold,
-                    italic=block.italic,
-                    underline=block.underline,
-                    direction="h",
-                )
+                # --- Modified new TextBlock creation using a deep copy for robustness ---
+                new_block = copy.deepcopy(block)
+                new_block.lines = new_lines
+                new_block.direction = "h"
                 new_block.is_rearranged = True
+                # --- End modification ---
                 temp_rearranged_blocks.append(new_block)
                 current_x += block_width + spacing
 
@@ -978,20 +970,12 @@ def rearrange_vertical_text_to_horizontal(
                     y_position + block_height,
                 )
             ]
-            new_block = TextBlock(
-                lines=new_lines,
-                texts=[block.text],
-                language=block.language,
-                font_size=block.font_size,
-                fg_color=block.fg_colors,
-                bg_color=block.bg_colors,
-                font_family=block.font_family,
-                bold=block.bold,
-                italic=block.italic,
-                underline=block.underline,
-                direction="h",
-            )
+            # --- Modified default new TextBlock creation using a deep copy ---
+            new_block = copy.deepcopy(block)
+            new_block.lines = new_lines
+            new_block.direction = "h"
             new_block.is_rearranged = True
+            # --- End modification ---
             rearranged_blocks.append(new_block)
             current_x += block_width + spacing
 
