@@ -684,7 +684,7 @@ def put_char_horizontal(font_size: int, cdpt: str, pen_l: Tuple[int, int], canva
 def put_text_horizontal(font_size: int, text: str, width: int, height: int, alignment: str,
                         reversed_direction: bool, fg: Tuple[int, int, int], bg: Tuple[int, int, int],
                         lang: str = 'en_US', hyphenate: bool = True, line_spacing: int = 0):
-    logger.debug(f"put_text_horizontal: {font_size}, {text}, {width}, {height}, {alignment}, {reversed_direction}, {fg}, {bg}, {lang}, {hyphenate}, {line_spacing}")
+    # logger.debug(f"put_text_horizontal: {font_size}, {text}, {width}, {height}, {alignment}, {reversed_direction}, {fg}, {bg}, {lang}, {hyphenate}, {line_spacing}")
     text = compact_special_symbols(text)
     if not text :
         return
