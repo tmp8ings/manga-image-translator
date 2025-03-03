@@ -1069,35 +1069,44 @@ def find_best_placement(
     original_area = original_width * original_height
     
     # Calculate horizontal aspect ratio (typically horizontal text is wider than tall)
-    # For Japanese/Korean vertical text converted to horizontal, 4:1 to 5:1 is common
-    horizontal_aspect_ratio = 4.0  # width:height ratio
+    # Reduce the aspect ratio to make height larger
+    horizontal_aspect_ratio = 3.0  # width:height ratio (was 4.0)
     
     # Calculate dimensions that maintain the same area but with horizontal orientation
-    # Formula: width * height = original_area and width/height = aspect_ratio
-    # Therefore: width = sqrt(original_area * aspect_ratio) and height = width / aspect_ratio
-    
-    # Calculate new width and height preserving the area
     block_width = int(np.sqrt(original_area * horizontal_aspect_ratio))
     block_height = int(original_area / block_width)
     
     # Adjust based on text length if provided
     if text_length > 0:
-        char_width_estimate = max(12, min(20, original_width / 2))  # Pixels per character
+        # Estimate character width based on language and font size
+        char_width_estimate = max(12, min(20, original_width / 2))
         text_based_width = text_length * char_width_estimate
         
         # Use text-based width if it's reasonable
         if text_based_width > block_width * 0.7 and text_based_width < block_width * 1.5:
-            # Adjust while maintaining area
             adjusted_width = text_based_width
-            adjusted_height = original_area / adjusted_width
+            # Calculate height based on text size with a minimum factor
+            font_size_estimate = max(16, min(30, original_height / 2))
+            min_lines = max(1, text_length / 20)  # Assume line break every ~20 chars
+            min_height_needed = font_size_estimate * min_lines * 1.5  # Add line spacing
+            
+            # Use either area-based height or text-based height, whichever is larger
+            area_based_height = original_area / adjusted_width
+            adjusted_height = max(area_based_height, min_height_needed)
+            
             block_width = int(adjusted_width)
             block_height = int(adjusted_height)
     
     # Ensure minimum dimensions and maximum dimensions
     block_width = max(block_width, 60)
     block_width = min(block_width, img.shape[1] - 20)
-    block_height = max(block_height, 20)
-    block_height = min(block_height, 80)  # Limit height to prevent overly tall blocks
+    # Increase minimum height and allow taller boxes
+    block_height = max(block_height, 35)  # Was 20, increased to 35
+    block_height = min(block_height, 120)  # Was 80, increased to 120
+    
+    # If original height was significant, ensure we don't make it too small
+    if original_height > 100:
+        block_height = max(block_height, original_height // 2)
     
     logger.debug(f"Original dimensions: {original_width}x{original_height}, New dimensions: {block_width}x{block_height}")
 
