@@ -876,14 +876,8 @@ def check_overlap(
 def rearrange_vertical_text_to_horizontal(
     text_blocks: List[TextBlock], img: np.ndarray
 ) -> List[TextBlock]:
-    vertical_caption_blocks: List[TextBlock] = []
-    horizontal_blocks: List[TextBlock] = []
-
-    for block in text_blocks:
-        if block.is_vertical_caption(img):
-            vertical_caption_blocks.append(block)
-        else:
-            horizontal_blocks.append(block)
+    vertical_caption_blocks = [block for block in text_blocks if block.is_vertical_caption(img)]
+    horizontal_blocks = [block for block in text_blocks if not block.is_vertical_caption(img)]
 
     existing_block_bboxes = [block.xyxy.tolist() for block in horizontal_blocks]
     vertical_caption_blocks.sort(key=lambda block: block.xyxy[0], reverse=True)
