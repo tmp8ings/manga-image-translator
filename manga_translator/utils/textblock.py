@@ -546,516 +546,252 @@ def sort_regions(regions: List[TextBlock], right_to_left=True) -> List[TextBlock
     return sorted_regions
 
 
-def find_background_candidates(
-    img: np.ndarray, 
-    min_width: int = 100, 
-    min_height: int = 50,
-    quality_threshold: float = 3000  # Increased threshold to be more lenient
-) -> List[Tuple[int, int, int, int]]:
-    """
-    Find regions with relatively uniform background suitable for text placement.
-    Uses multiple methods to detect candidate regions.
-    
-    Args:
-        img: Input image
-        min_width: Minimum width required for a region
-        min_height: Minimum height required for a region
-        quality_threshold: Maximum score for a region to be considered viable
-        
-    Returns:
-        List of tuples: (x, y, width, height) representing candidate regions
-    """
-    h, w = img.shape[:2]
-    regions = []
-    
-    # Define various region sizes to try (more variety)
-    grid_sizes = [(100, 40), (120, 60), (150, 60), (180, 80), (200, 80), (250, 100), (300, 120)]
-    
-    # More aggressive step size for denser sampling
-    step_size = 30
-    
-    # Convert to grayscale once for efficiency
-    gray_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    
-    # Calculate edge map with multiple parameters for better detection
-    edge_map1 = cv2.Canny(gray_img, 30, 100)  # More sensitive
-    edge_map2 = cv2.Canny(gray_img, 50, 150)  # Standard
-    edge_map = cv2.bitwise_or(edge_map1, edge_map2)
-    
-    # Apply slight blur to reduce noise sensitivity
-    blurred_gray = cv2.GaussianBlur(gray_img, (5, 5), 0)
-    
-    # Calculate auto threshold for adaptive behavior
-    mean_val = np.mean(gray_img)
-    std_val = np.std(gray_img)
-    auto_threshold = quality_threshold * (1 + (std_val / 128) * 0.5)  # Adjust threshold based on image complexity
-    
-    # Pre-compute scan positions to avoid duplicates
-    positions = []
-    for grid_w, grid_h in grid_sizes:
-        for y in range(0, h - grid_h, step_size):
-            for x in range(0, w - grid_w, step_size):
-                if x + min_width > w or y + min_height > h:
-                    continue
-                positions.append((x, y, grid_w, grid_h))
-    
-    # For each possible region
-    for x, y, grid_w, grid_h in positions:
-        # Extract region
-        region = gray_img[y:y+grid_h, x:x+grid_w]
-        region_edges = edge_map[y:y+grid_h, x:x+grid_w]
-        region_blurred = blurred_gray[y:y+grid_h, x:x+grid_w]
-        
-        # Multiple quality metrics
-        # 1. Color variance (lower is better)
-        variance = np.var(region)
-        
-        # 2. Edge density (lower is better)
-        edge_density = np.sum(region_edges > 0) / (grid_w * grid_h)
-        
-        # 3. Brightness uniformity (higher is better)
-        brightness = np.mean(region_blurred)
-        brightness_var = np.var(region_blurred) / (brightness + 1e-6)  # Normalized variance
-        
-        # 4. Texture uniformity using local binary patterns or simple gradient magnitude
-        gradient_x = cv2.Sobel(region_blurred, cv2.CV_64F, 1, 0, ksize=3)
-        gradient_y = cv2.Sobel(region_blurred, cv2.CV_64F, 0, 1, ksize=3)
-        gradient_mag = np.sqrt(gradient_x**2 + gradient_y**2)
-        texture_score = np.mean(gradient_mag)
-        
-        # 5. Region location preference (prefer edges and corners less)
-        center_x, center_y = w/2, h/2
-        dist_from_center = np.sqrt((x+grid_w/2-center_x)**2 + (y+grid_h/2-center_y)**2) / np.sqrt(center_x**2 + center_y**2)
-        location_penalty = 0
-        
-        # Penalize extreme edge regions
-        if x < w*0.05 or x > w*0.9 or y < h*0.05 or y > h*0.9:
-            location_penalty = 100
-        
-        # Combined score calculation with weighted factors
-        # Lower score is better for background regions
-        score = (
-            variance * 0.3 +                     # Color uniformity
-            edge_density * 600 +                 # Edge presence
-            brightness_var * 200 +               # Brightness consistency
-            texture_score * 10 +                 # Texture smoothness
-            location_penalty                     # Location suitability
-        )
-            
-        # Only add regions below the adaptive threshold 
-        if score < auto_threshold:
-            regions.append((x, y, grid_w, grid_h))
-    
-    # If we still didn't find enough regions, try with even more relaxed criteria
-    if len(regions) < 3:
-        logger.debug(f"First pass found only {len(regions)} regions, trying with relaxed criteria")
-        relaxed_regions = []
-        relaxed_threshold = auto_threshold * 1.5
-        
-        for x, y, grid_w, grid_h in positions:
-            # Skip small regions
-            if grid_w < min_width or grid_h < min_height:
-                continue
-                
-            # Simple variance check only
-            region = gray_img[y:y+grid_h, x:x+grid_w]
-            variance = np.var(region)
-            
-            # Add region if it's relatively uniform
-            if variance < 1000:  # Very permissive threshold
-                relaxed_regions.append((x, y, grid_w, grid_h))
-        
-        # Add these relaxed regions to our candidates
-        regions.extend(relaxed_regions)
-    
-    # Ensure we have at least some candidates
-    if len(regions) == 0:
-        logger.warning("Could not find any suitable background region, using default regions")
-        # Add some default regions spanning the image width
-        regions = [
-            (10, 10, w-20, 80),                   # Top band
-            (10, h//2-40, w-20, 80),             # Middle band
-            (10, h-90, w-20, 80)                 # Bottom band
-        ]
-    
-    # Remove duplicates (regions that are too similar)
-    unique_regions = []
-    for region in regions:
-        x1, y1, w1, h1 = region
-        is_duplicate = False
-        
-        for unique_region in unique_regions:
-            x2, y2, w2, h2 = unique_region
-            # If centers are close and sizes are similar, consider it a duplicate
-            if (abs(x1+w1/2 - (x2+w2/2)) < max(w1, w2) * 0.3 and 
-                abs(y1+h1/2 - (y2+h2/2)) < max(h1, h2) * 0.3):
-                is_duplicate = True
-                break
-        
-        if not is_duplicate:
-            unique_regions.append(region)
-    
-    logger.debug(f"Found {len(unique_regions)} unique background candidate regions")
-    return unique_regions
+# def sort_textblk_list(blk_list: List[TextBlock], im_w: int, im_h: int) -> List[TextBlock]:
+#     if len(blk_list) == 0:
+#         return blk_list
+#     num_ja = 0
+#     xyxy = []
+#     for blk in blk_list:
+#         if blk.language == 'ja':
+#             num_ja += 1
+#         xyxy.append(blk.xyxy)
+#     xyxy = np.array(xyxy)
+#     flip_lr = num_ja > len(blk_list) / 2
+#     im_oriw = im_w
+#     if im_w > im_h:
+#         im_w /= 2
+#     num_gridy, num_gridx = 4, 3
+#     img_area = im_h * im_w
+#     center_x = (xyxy[:, 0] + xyxy[:, 2]) / 2
+#     if flip_lr:
+#         if im_w != im_oriw:
+#             center_x = im_oriw - center_x
+#         else:
+#             center_x = im_w - center_x
+#     grid_x = (center_x / im_w * num_gridx).astype(np.int32)
+#     center_y = (xyxy[:, 1] + xyxy[:, 3]) / 2
+#     grid_y = (center_y / im_h * num_gridy).astype(np.int32)
+#     grid_indices = grid_y * num_gridx + grid_x
+#     grid_weights = grid_indices * img_area + 1.2 * (center_x - grid_x * im_w / num_gridx) + (center_y - grid_y * im_h / num_gridy)
+#     if im_w != im_oriw:
+#         grid_weights[np.where(grid_x >= num_gridx)] += img_area * num_gridy * num_gridx
 
+#     for blk, weight in zip(blk_list, grid_weights):
+#         blk.sort_weight = weight
+#     blk_list.sort(key=lambda blk: blk.sort_weight)
+#     return blk_list
 
-def rearrange_vertical_text_to_horizontal(
-    text_blocks: List[TextBlock], img: np.ndarray
-) -> List[TextBlock]:
-    """
-    Rearranges vertical text blocks to horizontal orientation,
-    maintaining reading order and optimizing placement.
-    
-    Args:
-        text_blocks: List of text blocks
-        img: Input image
-        
-    Returns:
-        List of text blocks with vertical captions rearranged horizontally
-    """
-    img_height, img_width = img.shape[:2]
-    
-    # Separate vertical captions from other text blocks
-    vertical_caption_blocks: List[TextBlock] = []
-    horizontal_blocks: List[TextBlock] = []
-    
-    for block in text_blocks:
-        if block.is_vertical_caption(img):
-            vertical_caption_blocks.append(block)
-        else:
-            horizontal_blocks.append(block)
-    
-    # If no vertical captions to rearrange, return original blocks
-    if not vertical_caption_blocks:
-        return text_blocks
-    
-    # Sort vertical blocks by reading order (for manga: right-to-left, top-to-bottom)
-    vertical_caption_blocks.sort(key=lambda b: (-b.xyxy[0], b.xyxy[1]))
-    
-    # Get existing block bounding boxes to avoid overlapping
-    existing_bbox_list = [block.xyxy.tolist() for block in horizontal_blocks]
-    
-    # Calculate adjusted sizes for horizontal layout
-    adjusted_block_sizes = []
-    
-    for block in vertical_caption_blocks:
-        # For vertical text becoming horizontal, we often need to swap width and height
-        # with some adjustments for readability
-        orig_width, orig_height = block.xywh[2], block.xywh[3]
-        
-        # Text that was tall and narrow will be wide and short in horizontal layout
-        # This ratio helps determine how much to adjust dimensions
-        aspect_ratio = orig_height / max(orig_width, 1)
-        
-        # Calculate new dimensions based on content
-        # For very tall blocks, make them wider but not too short
-        if aspect_ratio > 4:
-            # Very tall block becomes moderately wide
-            new_width = int(orig_height * 0.7)
-            new_height = int(orig_width * 1.5)
-        else:
-            # Normal adjustment
-            new_width = int(orig_height * 0.9)
-            new_height = int(orig_width * 1.2)
-        
-        # Scale text size appropriately
-        char_count = len(block.translation.strip())
-        if char_count > 0:
-            # Ensure width accommodates longer text
-            min_width_per_char = 10  # Minimum pixels per character
-            text_width_needed = char_count * min_width_per_char
-            new_width = max(new_width, text_width_needed)
-        
-        # Ensure minimum readable size
-        new_width = max(new_width, 50)
-        new_height = max(new_height, 20)
-        
-        adjusted_block_sizes.append((new_width, new_height))
-    
-    # Record original positions for reference
-    original_positions = [block.xyxy for block in vertical_caption_blocks]
-    original_centers = [block.center for block in vertical_caption_blocks]
-    
-    # Find background candidate regions
-    candidate_regions = find_background_candidates(
-        img, 
-        min_width=100,
-        min_height=max([h for _, h in adjusted_block_sizes]) + 20 if adjusted_block_sizes else 50
-    )
-    
-    if not candidate_regions:
-        logger.warning("No background candidates found. Using default regions.")
-        # Create default regions if none found
-        candidate_regions = [
-            (10, 10, img_width - 20, 100),
-            (10, img_height - 110, img_width - 20, 100)
-        ]
-    
-    # Try to find best placement within candidate regions
-    best_layout = None
-    best_score = float('inf')
-    
-    # First, try single-line layouts in candidate regions
-    for region in candidate_regions:
-        region_x, region_y, region_width, region_height = region
-        
-        # Check if region is large enough for all blocks in a single line
-        total_width_needed = sum([w + 20 for w, _ in adjusted_block_sizes]) - 20  # Subtract last spacing
-        if region_width < total_width_needed:
-            continue
-            
-        # Try placing all blocks in this region in a single line
-        layout_blocks = []
-        layout_positions = []
-        current_x = region_x + 10
-        current_y = region_y + 10
-        layout_failed = False
-        
-        for i, (block, (new_width, new_height)) in enumerate(zip(vertical_caption_blocks, adjusted_block_sizes)):
-            # Check boundaries
-            if current_x + new_width > region_x + region_width - 10:
-                layout_failed = True
-                break
-                
-            # Check overlap
-            proposed_bbox = (current_x, current_y, current_x + new_width, current_y + new_height)
-            if check_overlap(proposed_bbox, existing_bbox_list + layout_positions):
-                layout_failed = True
-                break
-                
-            # Create new block
-            new_lines = np.array([
-                [
-                    [current_x, current_y],
-                    [current_x + new_width, current_y],
-                    [current_x + new_width, current_y + new_height],
-                    [current_x, current_y + new_height],
-                ]
-            ], dtype=np.int32)
-            
-            new_block = copy.deepcopy(block)
-            new_block.lines = new_lines
-            new_block._direction = "h"
-            new_block.is_rearranged = True
-            
-            layout_blocks.append(new_block)
-            layout_positions.append(proposed_bbox)
-            
-            # Move to next position
-            current_x += new_width + 20
-            
-        if not layout_failed:
-            # Calculate score based on reading order preservation and position
-            
-            # 1. Reading order score - check if blocks maintain correct sequence
-            reading_order_score = 0
-            for i in range(len(layout_positions)-1):
-                # In single line layout, blocks should be arranged left to right
-                # in the same order as original right to left
-                if layout_positions[i][0] >= layout_positions[i+1][0]:  # Left to right violated
-                    reading_order_score += 10
-            
-            # 2. Distance from original position (weighted less)
-            position_score = 0
-            for i, pos in enumerate(layout_positions):
-                new_center = ((pos[0] + pos[2])/2, (pos[1] + pos[3])/2)
-                original_center = original_centers[i]
-                position_score += np.linalg.norm(np.array(new_center) - original_center) * 0.01
-            
-            # 3. Vertical position score (prefer positions closer to original vertical position)
-            vertical_score = 0
-            for i, pos in enumerate(layout_positions):
-                original_y = original_positions[i][1]
-                new_y = pos[1]
-                vertical_score += abs(original_y - new_y) * 0.05
-            
-            # Combined score (reading order is most important)
-            total_score = reading_order_score + position_score + vertical_score
-            
-            if total_score < best_score:
-                best_score = total_score
-                best_layout = layout_blocks
-    
-    # If single-line layout didn't work, try multi-line layouts
-    if best_layout is None:
-        for region in candidate_regions:
-            region_x, region_y, region_width, region_height = region
-            
-            # Skip very narrow regions
-            min_block_width = min([w for w, _ in adjusted_block_sizes])
-            if region_width < min_block_width + 20:
-                continue
-                
-            # Try multi-line arrangement
-            layout_blocks = []
-            layout_positions = []
-            current_x = region_x + 10
-            current_y = region_y + 10
-            row_height = 0
-            layout_failed = False
-            
-            for i, (block, (new_width, new_height)) in enumerate(zip(vertical_caption_blocks, adjusted_block_sizes)):
-                # Check if we need to move to next line
-                if current_x + new_width > region_x + region_width - 10:
-                    current_x = region_x + 10
-                    current_y += row_height + 10
-                    row_height = 0
-                    
-                # Check if we've exceeded the region height
-                if current_y + new_height > region_y + region_height - 10:
-                    layout_failed = True
-                    break
-                
-                # Check boundaries
-                if current_y + new_height > img_height - 10:
-                    layout_failed = True
-                    break
-                    
-                # Check overlap
-                proposed_bbox = (current_x, current_y, current_x + new_width, current_y + new_height)
-                if check_overlap(proposed_bbox, existing_bbox_list + layout_positions):
-                    layout_failed = True
-                    break
-                    
-                # Create new block
-                new_lines = np.array([
-                    [
-                        [current_x, current_y],
-                        [current_x + new_width, current_y],
-                        [current_x + new_width, current_y + new_height],
-                        [current_x, current_y + new_height],
-                    ]
-                ], dtype=np.int32)
-                
-                new_block = copy.deepcopy(block)
-                new_block.lines = new_lines
-                new_block._direction = "h"
-                new_block.is_rearranged = True
-                
-                layout_blocks.append(new_block)
-                layout_positions.append(proposed_bbox)
-                
-                # Update row height and move to next position
-                row_height = max(row_height, new_height)
-                current_x += new_width + 20
-                
-            if not layout_failed and len(layout_blocks) == len(vertical_caption_blocks):
-                # Calculate score as before but adapted for multi-line layout
-                
-                # For multi-line layout, we need to consider rows
-                rows = []
-                current_row = []
-                last_y = layout_positions[0][1]
-                
-                for i, pos in enumerate(layout_positions):
-                    if abs(pos[1] - last_y) > 20 and current_row:  # New row detected
-                        rows.append(current_row)
-                        current_row = [i]
-                        last_y = pos[1]
-                    else:
-                        current_row.append(i)
-                
-                if current_row:
-                    rows.append(current_row)
-                
-                # Check reading order within and across rows
-                reading_order_score = 0
-                
-                # Within each row, should be left to right
-                for row in rows:
-                    for i in range(len(row)-1):
-                        idx1, idx2 = row[i], row[i+1]
-                        if layout_positions[idx1][0] >= layout_positions[idx2][0]:
-                            reading_order_score += 5
-                
-                # Between rows, should be top to bottom
-                for i in range(len(rows)-1):
-                    top_row_y = layout_positions[rows[i][0]][1]
-                    bottom_row_y = layout_positions[rows[i+1][0]][1]
-                    if top_row_y >= bottom_row_y:
-                        reading_order_score += 10
-                
-                # Position score as before
-                position_score = 0
-                for i, pos in enumerate(layout_positions):
-                    new_center = ((pos[0] + pos[2])/2, (pos[1] + pos[3])/2)
-                    original_center = original_centers[i]
-                    position_score += np.linalg.norm(np.array(new_center) - original_center) * 0.01
-                
-                total_score = reading_order_score + position_score
-                
-                if total_score < best_score:
-                    best_score = total_score
-                    best_layout = layout_blocks
-    
-    # If still no layout found, try default placement
-    if best_layout is None:
-        logger.warning("Could not find suitable layout in candidate regions. Using fallback layout.")
-        best_layout = []
-        current_x, current_y = 10, 10
-        row_height = 0
-        
-        for block, (new_width, new_height) in zip(vertical_caption_blocks, adjusted_block_sizes):
-            # Simple wrap to next line when reaching edge
-            if current_x + new_width > img_width - 10:
-                current_x = 10
-                current_y += row_height + 10
-                row_height = 0
-            
-            # Create new block
-            new_lines = np.array([
-                [
-                    [current_x, current_y],
-                    [current_x + new_width, current_y],
-                    [current_x + new_width, current_y + new_height],
-                    [current_x, current_y + new_height],
-                ]
-            ], dtype=np.int32)
-            
-            new_block = copy.deepcopy(block)
-            new_block.lines = new_lines
-            new_block._direction = "h"
-            new_block.is_rearranged = True
-            
-            best_layout.append(new_block)
-            
-            # Update for next placement
-            row_height = max(row_height, new_height)
-            current_x += new_width + 20
-    
-    # Combine rearranged vertical blocks with original horizontal blocks
-    return best_layout + horizontal_blocks
+# # TODO: Make these cached_properties
+# def examine_textblk(blk: TextBlock, im_w: int, im_h: int, sort: bool = False) -> None:
+#     lines = blk.lines_array()
+#     middle_pnts = (lines[:, [1, 2, 3, 0]] + lines) / 2
+#     vec_v = middle_pnts[:, 2] - middle_pnts[:, 0]   # vertical vectors of textlines
+#     vec_h = middle_pnts[:, 1] - middle_pnts[:, 3]   # horizontal vectors of textlines
+#     # if sum of vertical vectors is longer, then text orientation is vertical, and vice versa.
+#     center_pnts = (lines[:, 0] + lines[:, 2]) / 2
+#     v = np.sum(vec_v, axis=0)
+#     h = np.sum(vec_h, axis=0)
+#     norm_v, norm_h = np.linalg.norm(v), np.linalg.norm(h)
+#     if blk.language == 'ja':
+#         vertical = norm_v > norm_h
+#     else:
+#         vertical = norm_v > norm_h * 2
+#     # calculate distance between textlines and origin
+#     if vertical:
+#         primary_vec, primary_norm = v, norm_v
+#         distance_vectors = center_pnts - np.array([[im_w, 0]], dtype=np.float64)   # vertical manga text is read from right to left, so origin is (imw, 0)
+#         font_size = int(round(norm_h / len(lines)))
+#     else:
+#         primary_vec, primary_norm = h, norm_h
+#         distance_vectors = center_pnts - np.array([[0, 0]], dtype=np.float64)
+#         font_size = int(round(norm_v / len(lines)))
 
+#     rotation_angle = int(math.atan2(primary_vec[1], primary_vec[0]) / math.pi * 180)     # rotation angle of textlines
+#     distance = np.linalg.norm(distance_vectors, axis=1)     # distance between textlinecenters and origin
+#     rad_matrix = np.arccos(np.einsum('ij, j->i', distance_vectors, primary_vec) / (distance * primary_norm))
+#     distance = np.abs(np.sin(rad_matrix) * distance)
+#     blk.lines = lines.astype(np.int32).tolist()
+#     blk.distance = distance
+#     blk.angle = rotation_angle
+#     if vertical:
+#         blk.angle -= 90
+#     if abs(blk.angle) < 3:
+#         blk.angle = 0
+#     blk.font_size = font_size
+#     blk.vertical = vertical
+#     blk.vec = primary_vec
+#     blk.norm = primary_norm
+#     if sort:
+#         blk.sort_lines()
 
-def check_overlap(
-    bbox1: Tuple[int, int, int, int], 
-    bbox_list: List[Tuple[int, int, int, int]], 
-    margin: int = 10
-) -> bool:
-    """
-    Check if a bounding box overlaps with any box in a list, with added margin.
-    
-    Args:
-        bbox1: Bounding box to check (x1, y1, x2, y2)
-        bbox_list: List of existing bounding boxes
-        margin: Extra margin to ensure spacing between boxes
-        
-    Returns:
-        True if overlap is detected, False otherwise
-    """
-    x1_1, y1_1, x2_1, y2_1 = bbox1
-    
-    # Add margin for better spacing
-    x1_1 -= margin
-    y1_1 -= margin
-    x2_1 += margin
-    y2_1 += margin
-    
-    for bbox2 in bbox_list:
-        x1_2, y1_2, x2_2, y2_2 = bbox2
-        if not (x2_1 < x1_2 or x2_2 < x1_1 or y2_1 < y1_2 or y2_2 < y1_1):
-            return True
-    return False
+# def try_merge_textline(blk: TextBlock, blk2: TextBlock, fntsize_tol=1.4, distance_tol=2) -> bool:
+#     if blk2.merged:
+#         return False
+#     fntsize_div = blk.font_size / blk2.font_size
+#     num_l1, num_l2 = len(blk), len(blk2)
+#     fntsz_avg = (blk.font_size * num_l1 + blk2.font_size * num_l2) / (num_l1 + num_l2)
+#     vec_prod = blk.vec @ blk2.vec
+#     vec_sum = blk.vec + blk2.vec
+#     cos_vec = vec_prod / blk.norm / blk2.norm
+#     distance = blk2.distance[-1] - blk.distance[-1]
+#     distance_p1 = np.linalg.norm(np.array(blk2.lines[-1][0]) - np.array(blk.lines[-1][0]))
+#     l1, l2 = Polygon(blk.lines[-1]), Polygon(blk2.lines[-1])
+#     if not l1.intersects(l2):
+#         if fntsize_div > fntsize_tol or 1 / fntsize_div > fntsize_tol:
+#             return False
+#         if abs(cos_vec) < 0.866:   # cos30
+#             return False
+#         # if distance > distance_tol * fntsz_avg or distance_p1 > fntsz_avg * 2.5:
+#         if distance > distance_tol * fntsz_avg:
+#             return False
+#         if blk.vertical and blk2.vertical and distance_p1 > fntsz_avg * 2.5:
+#             return False
+#     # merge
+#     blk.lines.append(blk2.lines[0])
+#     blk.vec = vec_sum
+#     blk.angle = int(round(np.rad2deg(math.atan2(vec_sum[1], vec_sum[0]))))
+#     if blk.vertical:
+#         blk.angle -= 90
+#     blk.norm = np.linalg.norm(vec_sum)
+#     blk.distance = np.append(blk.distance, blk2.distance[-1])
+#     blk.font_size = fntsz_avg
+#     blk2.merged = True
+#     return True
+
+# def merge_textlines(blk_list: List[TextBlock]) -> List[TextBlock]:
+#     if len(blk_list) < 2:
+#         return blk_list
+#     blk_list.sort(key=lambda blk: blk.distance[0])
+#     merged_list = []
+#     for ii, current_blk in enumerate(blk_list):
+#         if current_blk.merged:
+#             continue
+#         for jj, blk in enumerate(blk_list[ii+1:]):
+#             try_merge_textline(current_blk, blk)
+#         merged_list.append(current_blk)
+#     for blk in merged_list:
+#         blk.adjust_bbox(with_bbox=False)
+#     return merged_list
+
+# def split_textblk(blk: TextBlock):
+#     font_size, distance, lines = blk.font_size, blk.distance, blk.lines
+#     l0 = np.array(blk.lines[0])
+#     lines.sort(key=lambda line: np.linalg.norm(np.array(line[0]) - l0[0]))
+#     distance_tol = font_size * 2
+#     current_blk = copy.deepcopy(blk)
+#     current_blk.lines = [l0]
+#     sub_blk_list = [current_blk]
+#     textblock_splitted = False
+#     for jj, line in enumerate(lines[1:]):
+#         l1, l2 = Polygon(lines[jj]), Polygon(line)
+#         split = False
+#         if not l1.intersects(l2):
+#             line_disance = abs(distance[jj+1] - distance[jj])
+#             if line_disance > distance_tol:
+#                 split = True
+#             elif blk.vertical and abs(blk.angle) < 15:
+#                 if len(current_blk.lines) > 1 or line_disance > font_size:
+#                     split = abs(lines[jj][0][1] - line[0][1]) > font_size
+#         if split:
+#             current_blk = copy.deepcopy(current_blk)
+#             current_blk.lines = [line]
+#             sub_blk_list.append(current_blk)
+#         else:
+#             current_blk.lines.append(line)
+#     if len(sub_blk_list) > 1:
+#         textblock_splitted = True
+#         for current_blk in sub_blk_list:
+#             current_blk.adjust_bbox(with_bbox=False)
+#     return textblock_splitted, sub_blk_list
+
+# def group_output(blks, lines, im_w, im_h, mask=None, sort_blklist=True) -> List[TextBlock]:
+#     blk_list: List[TextBlock] = []
+#     scattered_lines = {'ver': [], 'hor': []}
+#     for bbox, lang_id, conf in zip(*blks):
+#         # cls could give wrong result
+#         blk_list.append(TextBlock(bbox, language=LANG_LIST[lang_id]))
+
+#     # step1: filter & assign lines to textblocks
+#     bbox_score_thresh = 0.4
+#     mask_score_thresh = 0.1
+#     for line in lines:
+#         bx1, bx2 = line[:, 0].min(), line[:, 0].max()
+#         by1, by2 = line[:, 1].min(), line[:, 1].max()
+#         bbox_score, bbox_idx = -1, -1
+#         line_area = (by2-by1) * (bx2-bx1)
+#         for i, blk in enumerate(blk_list):
+#             score = union_area(blk.xyxy, [bx1, by1, bx2, by2]) / line_area
+#             if bbox_score < score:
+#                 bbox_score = score
+#                 bbox_idx = i
+#         if bbox_score > bbox_score_thresh:
+#             blk_list[bbox_idx].lines.append(line)
+#         else: # if no textblock was assigned, check whether there is "enough" textmask
+#             if mask is not None:
+#                 mask_score = mask[by1: by2, bx1: bx2].mean() / 255
+#                 if mask_score < mask_score_thresh:
+#                     continue
+#             blk = TextBlock([bx1, by1, bx2, by2], [line])
+#             examine_textblk(blk, im_w, im_h, sort=False)
+#             if blk.vertical:
+#                 scattered_lines['ver'].append(blk)
+#             else:
+#                 scattered_lines['hor'].append(blk)
+
+#     # step2: filter textblocks, sort & split textlines
+#     final_blk_list = []
+#     for blk in blk_list:
+#         # filter textblocks
+#         if len(blk.lines) == 0:
+#             bx1, by1, bx2, by2 = blk.xyxy
+#             if mask is not None:
+#                 mask_score = mask[by1: by2, bx1: bx2].mean() / 255
+#                 if mask_score < mask_score_thresh:
+#                     continue
+#             xywh = np.array([[bx1, by1, bx2-bx1, by2-by1]])
+#             blk.lines = xywh2xyxypoly(xywh).reshape(-1, 4, 2).tolist()
+#         examine_textblk(blk, im_w, im_h, sort=True)
+
+#         # split manga text if there is a distance gap
+#         textblock_splitted = False
+#         if len(blk.lines) > 1:
+#             if blk.language == 'ja':
+#                 textblock_splitted = True
+#             elif blk.vertical:
+#                 textblock_splitted = True
+#         if textblock_splitted:
+#             textblock_splitted, sub_blk_list = split_textblk(blk)
+#         else:
+#             sub_blk_list = [blk]
+#         # modify textblock to fit its textlines
+#         if not textblock_splitted:
+#             for blk in sub_blk_list:
+#                 blk.adjust_bbox(with_bbox=True)
+#         final_blk_list += sub_blk_list
+
+#     # step3: merge scattered lines, sort textblocks by "grid"
+#     final_blk_list += merge_textlines(scattered_lines['hor'])
+#     final_blk_list += merge_textlines(scattered_lines['ver'])
+#     if sort_blklist:
+#         final_blk_list = sort_textblk_list(final_blk_list, im_w, im_h)
+
+#     for blk in final_blk_list:
+#         if blk.language != 'ja' and not blk.vertical:
+#             num_lines = len(blk.lines)
+#             if num_lines == 0:
+#                 continue
+#             # blk.line_spacing = blk.bounding_rect()[3] / num_lines / blk.font_size
+#             expand_size = max(int(blk.font_size * 0.1), 3)
+#             rad = np.deg2rad(blk.angle)
+#             shifted_vec = np.array([[[-1, -1],[1, -1],[1, 1],[-1, 1]]])
+#             shifted_vec = shifted_vec * np.array([[[np.sin(rad), np.cos(rad)]]]) * expand_size
+#             lines = blk.lines_array() + shifted_vec
+#             lines[..., 0] = np.clip(lines[..., 0], 0, im_w-1)
+#             lines[..., 1] = np.clip(lines[..., 1], 0, im_h-1)
+#             blk.lines = lines.astype(np.int64).tolist()
+#             blk.font_size += expand_size
+
+#     return final_blk_list
 
 
 def visualize_textblocks(canvas: np.ndarray, blk_list: List[TextBlock]):
@@ -1108,3 +844,134 @@ def visualize_textblocks(canvas: np.ndarray, blk_list: List[TextBlock]):
             2,
         )
     return canvas
+
+
+# find_best_background_regions, check_overlap, rearrange_vertical_text_to_horizontal 함수는 이전 답변과 동일하게 사용합니다.
+def find_best_background_regions(
+    img: np.ndarray, grid_size: int = 50, num_regions: int = 5
+) -> List[Tuple[Tuple[int, int], float]]:
+    h, w = img.shape[:2]
+    regions_variance = []
+
+    for y in range(0, h - grid_size, grid_size):
+        for x in range(0, w - grid_size, grid_size):
+            region = img[y : y + grid_size, x : x + grid_size]
+            gray_region = cv2.cvtColor(region, cv2.COLOR_BGR2GRAY)
+            variance = np.var(gray_region)
+            regions_variance.append(((x, y), variance))
+
+    regions_variance.sort(key=lambda item: item[1])
+    return regions_variance[:num_regions]
+
+
+def check_overlap(
+    bbox1: Tuple[int, int, int, int], bbox_list: List[Tuple[int, int, int, int]]
+) -> bool:
+    x1_1, y1_1, x2_1, y2_1 = bbox1
+    for bbox2 in bbox_list:
+        x1_2, y1_2, x2_2, y2_2 = bbox2
+        if not (x2_1 < x1_2 or x2_2 < x1_1 or y2_1 < y1_2 or y2_2 < y1_1):
+            return True
+    return False
+
+
+def find_all_background_regions(img: np.ndarray, grid_size: int = 50, variance_threshold: float = 30) -> List[Tuple[int, int, int, int]]:
+    """
+    Returns all grid cells (as (x, y, width, height)) with low variance.
+    """
+    h, w = img.shape[:2]
+    candidates = []
+    for y in range(0, h - grid_size + 1, grid_size):
+        for x in range(0, w - grid_size + 1, grid_size):
+            region = img[y:y+grid_size, x:x+grid_size]
+            gray = cv2.cvtColor(region, cv2.COLOR_BGR2GRAY)
+            if np.var(gray) < variance_threshold:
+                candidates.append((x, y, grid_size, grid_size))
+    return candidates
+
+
+def rearrange_vertical_text_to_horizontal(text_blocks: List[TextBlock], img: np.ndarray) -> List[TextBlock]:
+    # Separate vertical caption and horizontal blocks
+    vertical_caption_blocks: List[TextBlock] = []
+    horizontal_blocks: List[TextBlock] = []
+    for block in text_blocks:
+        if block.is_vertical_caption(img):
+            vertical_caption_blocks.append(block)
+        else:
+            horizontal_blocks.append(block)
+    
+    # Sort vertical blocks by original reading order (top-to-bottom, then left-to-right)
+    vertical_caption_blocks.sort(key=lambda b: (b.xyxy[1], b.xyxy[0]))
+    
+    placed_boxes = []  # List of (x1, y1, x2, y2) for already placed blocks
+    rearranged_blocks = []
+    img_h, img_w = img.shape[:2]
+    
+    # Get all candidate regions from background using our helper
+    candidate_regions = find_all_background_regions(img, grid_size=50, variance_threshold=30)
+    
+    for block in vertical_caption_blocks:
+        block_w, block_h = block.xywh[2], block.xywh[3]
+        orig_center = block.center
+        placed = False
+
+        # Try to find candidate region based on proximity to original center.
+        sorted_candidates = sorted(candidate_regions, key=lambda r: ((r[0]-orig_center[0])**2 + (r[1]-orig_center[1])**2))
+        for cand in sorted_candidates:
+            cand_x, cand_y, cand_w, cand_h = cand
+            if cand_w >= block_w and cand_h >= block_h:
+                proposed_bbox = (cand_x, cand_y, cand_x + block_w, cand_y + block_h)
+                if proposed_bbox[2] > img_w or proposed_bbox[3] > img_h:
+                    continue
+                # Check overlap with previously placed boxes.
+                overlap = False
+                for pb in placed_boxes:
+                    if not (proposed_bbox[2] <= pb[0] or pb[2] <= proposed_bbox[0] or 
+                            proposed_bbox[3] <= pb[1] or pb[3] <= proposed_bbox[1]):
+                        overlap = True
+                        break
+                if not overlap:
+                    new_lines = np.array([
+                        [
+                            [proposed_bbox[0], proposed_bbox[1]],
+                            [proposed_bbox[2], proposed_bbox[1]],
+                            [proposed_bbox[2], proposed_bbox[3]],
+                            [proposed_bbox[0], proposed_bbox[3]]
+                        ]
+                    ], dtype=np.int32)
+                    new_block = copy.deepcopy(block)
+                    new_block.lines = new_lines
+                    new_block._direction = "h"
+                    new_block.is_rearranged = True
+                    rearranged_blocks.append(new_block)
+                    placed_boxes.append(proposed_bbox)
+                    placed = True
+                    break
+
+        # Fallback: place at top (if original near top) or bottom edge.
+        if not placed:
+            margin = 10
+            fallback_y = margin if orig_center[1] < img_h / 2 else img_h - block_h - margin
+            fallback_x = min(max(int(orig_center[0] - block_w / 2), margin), img_w - block_w - margin)
+            proposed_bbox = (fallback_x, fallback_y, fallback_x + block_w, fallback_y + block_h)
+            # Try shifting horizontally if overlapping.
+            while any(not (proposed_bbox[2] <= pb[0] or pb[2] <= proposed_bbox[0] or 
+                            proposed_bbox[3] <= pb[1] or pb[3] <= proposed_bbox[1]) for pb in placed_boxes) and proposed_bbox[2] < img_w - margin:
+                fallback_x += 5
+                proposed_bbox = (fallback_x, fallback_y, fallback_x + block_w, fallback_y + block_h)
+            new_lines = np.array([
+                [
+                    [proposed_bbox[0], proposed_bbox[1]],
+                    [proposed_bbox[2], proposed_bbox[1]],
+                    [proposed_bbox[2], proposed_bbox[3]],
+                    [proposed_bbox[0], proposed_bbox[3]]
+                ]
+            ], dtype=np.int32)
+            new_block = copy.deepcopy(block)
+            new_block.lines = new_lines
+            new_block._direction = "h"
+            new_block.is_rearranged = True
+            rearranged_blocks.append(new_block)
+            placed_boxes.append(proposed_bbox)
+    
+    return rearranged_blocks + horizontal_blocks
