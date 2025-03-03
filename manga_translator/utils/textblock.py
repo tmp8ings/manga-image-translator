@@ -916,9 +916,14 @@ def rearrange_vertical_text_to_horizontal(
             )
 
     # Return all blocks (both original horizontal and rearranged vertical)
-    return result_blocks + [
+    result = result_blocks + [
         blk for blk in vertical_caption_blocks if not blk.is_rearranged
     ]
+    
+    for blk in result:
+        blk.optimize_font_size()
+    
+    return result
 
 
 def find_candidate_locations(
