@@ -208,6 +208,7 @@ def get_char_glyph(cdpt: str, font_size: int, direction: int) -> Glyph:
             face.set_pixel_sizes(0, font_size)
         elif direction == 1:
             face.set_pixel_sizes(font_size, 0)
+        logger.debug(f"get_char_glyph: {cdpt}: {font_size}, {direction}")
         face.load_char(cdpt)
         return Glyph(face.glyph)
 
@@ -694,6 +695,7 @@ def put_text_horizontal(font_size: int, text: str, width: int, height: int, alig
     # calc
     # print(width)
     line_text_list, line_width_list = calc_horizontal(font_size, text, width, height, lang, hyphenate)
+    logger.debug(f"put_text_horizontal - line_text_list: {line_text_list}, line_width_list: {line_width_list}")
     # print(line_text_list, line_width_list)
 
     # make large canvas
