@@ -506,11 +506,11 @@ class TextBlock(object):
     def optimize_font_size(self, min_size=12, target_fill_ratio=0.95):
         """
         Optimize the font size to better fill the text box, always assuming Korean text.
-        
+
         Args:
             min_size (int): Minimum acceptable font size
             target_fill_ratio (float): Target ratio of text area to box area (0.0-1.0)
-                
+
         Returns:
             int: The optimized font size
         """
@@ -518,74 +518,114 @@ class TextBlock(object):
         original_font_size = self.font_size
         width, height = self.unrotated_size
         box_area = width * height
-        
+
         if not self.translation and not self.text:
             return original_font_size  # Keep current font size if no text
-            
+
         text = self.translation if self.translation else self.text
         text_length = len(text)
-        
+
         # Always treat text as Korean (CJK)
-        if self.direction.startswith('v'):
+        if self.direction.startswith("v"):
+            logger.debug(
+                f"Optimizing vertical Korean font size for {text[:4]}=============="
+            )
             # For vertical text - Korean characters need more height
             estimated_chars_per_column = 1.1  # Optimized for Korean
             text_height = height * 0.95  # Use 95% of height
             lines_estimate = max(1, round(text_length / estimated_chars_per_column))
-            
+            logger.debug(
+                f"Estimated lines: {lines_estimate}, text height: {text_height}, lines_estimate: {lines_estimate}"
+            )
+
             # Calculate font size based on available height divided by estimated lines
             font_size = int(text_height / (lines_estimate * self.line_spacing))
-            
+
             # Adjust based on width constraints - Korean characters are square-ish
             char_width = 1.0  # Korean characters are square and need full width
             width_based_size = int(width / char_width)
-            
+
             # Take the smaller of the two constraints
+            logger.debug(
+                f"Font size based on height: {font_size}, based on width: {width_based_size}"
+            )
             font_size = min(font_size, width_based_size)
+            logger.debug(
+                f"result: {font_size}=============================================="
+            )
         else:
+            logger.debug(
+                f"Optimizing vertical Korean font size for {text[:4]}=============="
+            )
             # For horizontal text - Korean specific values
             avg_char_width = 1.0  # Korean characters are square-ish
-            
+
             # Korean takes more horizontal space per character than Latin
             reasonable_width = width * 0.95  # Use 95% of width
-            chars_per_line = reasonable_width / (avg_char_width * 17)  # Adjusted for Korean (larger than 15)
-            
+            chars_per_line = reasonable_width / (
+                avg_char_width * 17
+            )  # Adjusted for Korean (larger than 15)
+
             # Estimate number of lines needed
             lines_needed = max(1, round(text_length / chars_per_line))
-            
+            logger.debug(
+                f"Estimated lines: {lines_needed}, chars per line: {chars_per_line}"
+            )
+
             # Calculate height per line
             line_height = height * 0.98 / (lines_needed * self.line_spacing)
-            
+
             # Calculate width-based size (horizontal constraint)
             width_based_size = reasonable_width / (chars_per_line * avg_char_width)
             
+            logger.debug(
+                f"Font size based on height: {line_height}, based on width: {width_based_size}"
+            )
+
             # Use the smaller of height and width constraints
             # For Korean, prioritize height slightly more for better readability
-            font_size = min(int(line_height * 1.05), int(width_based_size * target_fill_ratio))
-            
+            font_size = min(
+                int(line_height * 1.05), int(width_based_size * target_fill_ratio)
+            )
+            logger.debug(
+                f"result: {font_size}=============================================="
+            )
+
             # Boost size for short text that can fit in one line
             if text_length <= chars_per_line * 0.7:  # Stricter for Korean (0.7 vs 0.8)
                 font_size = int(line_height * 1.4)  # Larger boost for Korean
-        
+                logger.debug(
+                    f"Short text boost: {font_size}=============================================="
+                )
+            
+            logger.debug(
+                f"result: {font_size}=============================================="
+            )
+
         # Apply minimum size constraint
         font_size = max(min_size, font_size)
-        
+
         # Apply a boost factor to make text larger - adjusted for Korean readability
-        boost_factor = 1.6 if text_length < 10 else 1.3  # Higher boost factors for Korean
+        boost_factor = (
+            1.6 if text_length < 10 else 1.3
+        )  # Higher boost factors for Korean
         font_size = int(font_size * boost_factor)
-        
+
         # Additional boost for very small boxes (likely containing short text)
         if box_area < 10000:  # Small text box threshold
             font_size = int(font_size * 1.3)
-        
+
         # Final adjustment based on aspect ratio
         if self.aspect_ratio > 3 or self.aspect_ratio < 0.3:
             # Extreme aspect ratios (very wide or very tall)
             font_size = int(font_size * 0.85)  # Reduce size for better fit
-        
+
         self.font_size = font_size
-        
+
         logger.debug(f"Optimized Korean font size for {text}")
-        logger.debug(f"{original_font_size} -> {font_size} (w:{width}, h:{height}, len:{text_length})")
+        logger.debug(
+            f"{original_font_size} -> {font_size} (w:{width}, h:{height}, len:{text_length})"
+        )
         return font_size
 
 
@@ -940,10 +980,10 @@ def rearrange_vertical_text_to_horizontal(
     result = result_blocks + [
         blk for blk in vertical_caption_blocks if not blk.is_rearranged
     ]
-    
+
     for blk in result:
         blk.optimize_font_size()
-    
+
     return result
 
 
@@ -1071,39 +1111,41 @@ def find_best_placement(
     # Get original position and dimensions
     orig_x, orig_y = block.center
     original_width, original_height = block.unrotated_size
-    
+
     # Calculate the original area - we'll preserve this
     original_area = original_width * original_height
-    
+
     # Step 1: Calculate new width based on text length and other factors
     if text_length > 0:
         # Use text length to estimate width
         char_width = 15  # Pixels per character (adjustable)
         new_width = text_length * char_width
-        
+
         # Ensure it's not too small or too large
         new_width = max(new_width, original_width * 0.8)
-        new_width = min(new_width, img.shape[1] * 0.8)  # Don't exceed 80% of image width
+        new_width = min(
+            new_width, img.shape[1] * 0.8
+        )  # Don't exceed 80% of image width
     else:
         # If no text length info, estimate based on vertical caption characteristics
         # Vertical captions typically have small width and large height
         # When converted to horizontal, they should be wider and less tall
         new_width = original_height * 1.2  # Use height as a basis for new width
-    
+
     # Step 2: Calculate height to preserve original area
     new_height = original_area / new_width
-    
+
     # Apply reasonable constraints
     new_width = int(max(new_width, 80))  # Minimum width
     new_width = int(min(new_width, img.shape[1] - 20))  # Maximum width
-    
+
     new_height = int(max(new_height, 20))  # Minimum height
     new_height = int(min(new_height, 100, img.shape[0] * 0.2))  # Maximum height
-    
+
     # Recalculate to ensure area preservation after constraints
     adjusted_area = new_width * new_height
     area_ratio = original_area / adjusted_area
-    
+
     # If area changed significantly due to constraints, adjust as needed
     if 0.8 <= area_ratio <= 1.25:
         # Area is reasonably preserved, no need to adjust further
@@ -1114,15 +1156,21 @@ def find_best_placement(
             # Increase height to compensate (width is often more important)
             block_width = new_width
             block_height = int(original_area / block_width)
-            block_height = min(block_height, 100, img.shape[0] * 0.2)  # Apply max limit again
+            block_height = min(
+                block_height, 100, img.shape[0] * 0.2
+            )  # Apply max limit again
         else:  # New area is larger than original
             # Adjust width to match original area
             block_height = new_height
             block_width = int(original_area / block_height)
             block_width = min(block_width, img.shape[1] - 20)  # Apply max limit again
-    
-    logger.debug(f"Original dimensions: {original_width}x{original_height}, area: {original_area}")
-    logger.debug(f"New dimensions: {block_width}x{block_height}, area: {block_width*block_height}")
+
+    logger.debug(
+        f"Original dimensions: {original_width}x{original_height}, area: {original_area}"
+    )
+    logger.debug(
+        f"New dimensions: {block_width}x{block_height}, area: {block_width*block_height}"
+    )
 
     # Score each candidate location
     best_score = float("inf")
