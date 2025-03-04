@@ -920,6 +920,8 @@ def find_best_placement(
 
     # Calculate the original area - we'll preserve this
     original_area = original_width * original_height
+    
+    logger.debug(f"Original dimensions: {original_width}x{original_height}, area: {original_area}")
 
     # Step 1: Calculate new width based on text length and other factors
     if text_length > 0:
@@ -941,48 +943,53 @@ def find_best_placement(
     # Step 2: Calculate height to preserve original area
     new_height = original_area / new_width
 
-    # Apply reasonable constraints
-    new_width = int(max(new_width, 80))  # Minimum width
-    new_width = int(min(new_width, img.shape[1] - 20))  # Maximum width
-
-    new_height = int(max(new_height, 20))  # Minimum height
-    new_height = int(min(new_height, 100, img.shape[0] * 0.2))  # Maximum height
-
-    # Recalculate to ensure area preservation after constraints
-    adjusted_area = new_width * new_height
-    area_ratio = original_area / adjusted_area
-
-    # If area changed significantly due to constraints, adjust as needed
-    if 0.8 <= area_ratio <= 1.25:
-        # Area is reasonably preserved, no need to adjust further
-        block_width, block_height = new_width, new_height
-    else:
-        # Area changed too much, recalculate one dimension
-        if area_ratio > 1:  # New area is smaller than original
-            # Increase height to compensate (width is often more important)
-            block_width = new_width
-            block_height = int(original_area / block_width)
-            block_height = min(
-                block_height, 100, img.shape[0] * 0.2
-            )  # Apply max limit again
-        else:  # New area is larger than original
-            # Adjust width to match original area
-            block_height = new_height
-            block_width = int(original_area / block_height)
-            block_width = min(block_width, img.shape[1] - 20)  # Apply max limit again
-
-    logger.debug(
-        f"Original dimensions: {original_width}x{original_height}, area: {original_area}"
-    )
-    logger.debug(
-        f"New dimensions: {block_width}x{block_height}, area: {block_width*block_height}"
-    )
+    # Apply reasonable constraints while preserving area
+    img_height, img_width = img.shape[:2]
+    
+    # Maximum width constraint (don't exceed image width)
+    max_width = min(img_width - 20, 800)  # Allow larger widths but stay within image
+    if new_width > max_width:
+        new_width = max_width
+        new_height = original_area / new_width
+    
+    # Maximum height constraint (don't be too tall)
+    max_height = min(img_height * 0.3, 150)  # Allow taller heights but stay reasonable
+    if new_height > max_height:
+        new_height = max_height
+        new_width = original_area / new_height
+    
+    # Minimum size constraints - only apply if absolutely necessary
+    min_width = 80
+    min_height = 20
+    
+    if new_width < min_width:
+        new_width = min_width
+        new_height = original_area / new_width
+    
+    if new_height < min_height:
+        new_height = min_height
+        new_width = original_area / new_height
+    
+    # Final rounding to integers
+    block_width = int(new_width)
+    block_height = int(new_height)
+    
+    # Check area preservation
+    new_area = block_width * block_height
+    area_ratio = new_area / original_area
+    
+    logger.debug(f"New dimensions: {block_width}x{block_height}, area: {new_area}, ratio: {area_ratio:.2f}")
+    
+    # If area is significantly smaller, try to increase dimensions
+    if area_ratio < 0.9:
+        adjustment_factor = (original_area / new_area) ** 0.5
+        block_width = int(block_width * adjustment_factor)
+        block_height = int(block_height * adjustment_factor)
+        logger.debug(f"Area adjusted dimensions: {block_width}x{block_height}, new area: {block_width*block_height}")
 
     # Score each candidate location
     best_score = float("inf")
     best_location = None
-
-    img_height, img_width = img.shape[:2]
 
     # If no candidates or very few, add some default positions
     if len(candidates) < 3:
@@ -1048,8 +1055,8 @@ def find_best_placement(
         top_rect = (
             10,
             10,
-            min(10 + block_width, img_width - 10),
-            min(10 + block_height, img_height // 3),
+            10 + block_width,
+            10 + block_height,
         )
         if not any(
             blocks_overlap(top_rect, existing.xyxy) for existing in existing_blocks
@@ -1060,7 +1067,7 @@ def find_best_placement(
         bottom_rect = (
             10,
             max(10, img_height - block_height - 10),
-            min(10 + block_width, img_width - 10),
+            10 + block_width,
             img_height - 10,
         )
         if not any(
@@ -1068,11 +1075,11 @@ def find_best_placement(
         ):
             return bottom_rect
 
-        # Last resort: adjust width and try again with minimal width
-        min_width = min(block_width, 200)
-        min_height = int(original_area / min_width)  # Maintain area
-        min_height = min(min_height, 100)  # Cap the height
-        min_rect = (10, 10, 10 + min_width, 10 + min_height)
+        # Last resort: try with 80% of the original area
+        adjusted_width = int(block_width * 0.9)
+        adjusted_height = int(block_height * 0.9)
+        min_rect = (10, 10, 10 + adjusted_width, 10 + adjusted_height)
+        logger.debug(f"Using last resort placement with dimensions: {adjusted_width}x{adjusted_height}")
         return min_rect
 
     return best_location
