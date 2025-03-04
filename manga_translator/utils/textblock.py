@@ -1,3 +1,4 @@
+import math
 import cv2
 from manga_translator.config import Direction
 from manga_translator.utils.log import get_logger
@@ -506,11 +507,11 @@ class TextBlock(object):
     def optimize_font_size(self, min_size=12, target_fill_ratio=0.95):
         """
         Optimize the font size to better fill the entire text box area, optimized for Korean text.
-        
+
         Args:
             min_size (int): Minimum acceptable font size
             target_fill_ratio (float): Target ratio of text area to box area (0.0-1.0)
-            
+
         Returns:
             int: The optimized font size
         """
@@ -518,99 +519,123 @@ class TextBlock(object):
         original_font_size = self.font_size
         width, height = self.unrotated_size
         box_area = width * height
-        
+
         if not self.translation and not self.text:
             return original_font_size  # Keep current font size if no text
-            
+
         text = self.translation if self.translation else self.text
         text_length = len(text)
-        
+
         # Korean character properties
         korean_char_ratio = 0.9  # Width to height ratio for Korean characters
         char_space_factor = 1.1  # Space factor between characters
-        
+
         # Calculate target characters per line based on box dimensions
-        if self.direction.startswith('v'):
-            logger.debug(f"Optimizing vertical Korean font size for {text[:4]}==============")
+        if self.direction.startswith("v"):
+            logger.debug(
+                f"Optimizing vertical Korean font size for {text[:4]}=============="
+            )
             # For vertical text
             max_lines = width / (height * 0.15)  # Estimate max columns
-            max_lines = max(1, min(max_lines, text_length))  # At least 1, at most text_length
-            
+            max_lines = max(
+                1, min(max_lines, text_length)
+            )  # At least 1, at most text_length
+
             # Calculate characters per line to fill the box
             chars_per_line = text_length / max_lines
-            
+
             # Calculate optimal font height to fill vertical space
             line_height = height / chars_per_line
             font_size_by_height = int(line_height * 0.95)  # 95% to avoid overflow
-            
+
             # Calculate optimal font width to fill horizontal space
             font_size_by_width = int(width / max_lines * 0.95)
-            
+
             # Use the smaller of the two to ensure text fits
             font_size = min(font_size_by_height, font_size_by_width)
-            
-            logger.debug(f"Vertical: max_lines={max_lines:.1f}, chars_per_line={chars_per_line:.1f}")
-            logger.debug(f"Font size by height: {font_size_by_height}, by width: {font_size_by_width}")
-            
+
+            logger.debug(
+                f"Vertical: max_lines={max_lines:.1f}, chars_per_line={chars_per_line:.1f}"
+            )
+            logger.debug(
+                f"Font size by height: {font_size_by_height}, by width: {font_size_by_width}"
+            )
+
         else:
-            logger.debug(f"Optimizing horizontal Korean font size for {text[:4]}==============")
+            logger.debug(
+                f"Optimizing horizontal Korean font size for {text[:4]}=============="
+            )
             # For horizontal text
-            
+
             # Calculate optimal font size to fill the entire box area
             # For Korean text, estimate lines based on character count and box width
-            
+
             # Estimate optimal font size
             optimal_area_per_char = box_area / text_length
-            base_font_size = int(math.sqrt(optimal_area_per_char) * 1.2)  # 1.2 is an empirical factor
-            
+            base_font_size = int(
+                math.sqrt(optimal_area_per_char) * 1.2
+            )  # 1.2 is an empirical factor
+
             # Estimate lines with this font size
-            estimated_chars_per_line = width / (base_font_size * korean_char_ratio * char_space_factor)
+            estimated_chars_per_line = width / (
+                base_font_size * korean_char_ratio * char_space_factor
+            )
             estimated_lines = math.ceil(text_length / estimated_chars_per_line)
-            
+
             # Refine font size based on estimated lines
             font_height = height / (estimated_lines * self.line_spacing)
             font_width = width / (estimated_chars_per_line * char_space_factor)
-            
+
             # Convert to font size (smaller of height/width constraints)
             font_size_by_height = int(font_height * 0.95)  # 95% to avoid overflow
             font_size_by_width = int(font_width / korean_char_ratio * 0.95)
-            
+
             # Use the smaller value to ensure text fits in box
             font_size = min(font_size_by_height, font_size_by_width)
-            
-            logger.debug(f"Horizontal: estimated_lines={estimated_lines}, chars_per_line={estimated_chars_per_line:.1f}")
-            logger.debug(f"Font size by height: {font_size_by_height}, by width: {font_size_by_width}")
-            
+
+            logger.debug(
+                f"Horizontal: estimated_lines={estimated_lines}, chars_per_line={estimated_chars_per_line:.1f}"
+            )
+            logger.debug(
+                f"Font size by height: {font_size_by_height}, by width: {font_size_by_width}"
+            )
+
             # For very short text, we can use larger font
             if text_length < estimated_chars_per_line * 0.7 and estimated_lines == 1:
                 font_size = int(font_size * 1.3)  # Boost for short text
                 logger.debug(f"Short text boost: {font_size}")
-        
+
         # Apply minimum size constraint
         font_size = max(min_size, font_size)
-        
+
         # Boost based on box area and text length
         area_factor = min(1.0 + (10000 / max(box_area, 1000)), 1.5)
         text_factor = min(1.0 + (10 / max(text_length, 5)), 1.4)
         font_size = int(font_size * area_factor * text_factor)
-        
+
         # Limit maximum size for readability
-        max_reasonable_size = min(height // 2, width // 2, 80)  # Maximum reasonable font size
+        max_reasonable_size = min(
+            height // 2, width // 2, 80
+        )  # Maximum reasonable font size
         font_size = min(font_size, max_reasonable_size)
-        
+
         # Special case for very small boxes
         if box_area < 5000:
-            font_size = max(font_size, min(24, height // 2))  # Ensure visibility in small boxes
-        
+            font_size = max(
+                font_size, min(24, height // 2)
+            )  # Ensure visibility in small boxes
+
         # For extremely wide or tall boxes, adjust aspect-based size
         if self.aspect_ratio > 4 or self.aspect_ratio < 0.25:
             font_size = int(font_size * 0.85)  # Reduce size for extreme aspect ratios
-        
+
         self.font_size = font_size
-        
+
         logger.debug(f"Optimized Korean font size: {original_font_size} -> {font_size}")
-        logger.debug(f"Box: {width}x{height}, area: {box_area}, text length: {text_length}")
-        
+        logger.debug(
+            f"Box: {width}x{height}, area: {box_area}, text length: {text_length}"
+        )
+
         return font_size
 
 
@@ -656,171 +681,6 @@ def sort_regions(regions: List[TextBlock], right_to_left=True) -> List[TextBlock
         else:
             sorted_regions.append(region)
     return sorted_regions
-
-
-# def sort_textblk_list(blk_list: List[TextBlock], im_w: int, im_h: int) -> List[TextBlock]:
-#     if len(blk_list) == 0:
-#         return blk_list
-#     num_ja = 0
-#     xyxy = []
-#     for blk in blk_list:
-#         if blk.language == 'ja':
-#             num_ja += 1
-#         xyxy.append(blk.xyxy)
-#     xyxy = np.array(xyxy)
-#     flip_lr = num_ja > len(blk_list) / 2
-#     im_oriw = im_w
-#     if im_w > im_h:
-#         im_w /= 2
-#     num_gridy, num_gridx = 4, 3
-#     img_area = im_h * im_w
-#     center_x = (xyxy[:, 0] + xyxy[:, 2]) / 2
-#     if flip_lr:
-#         if im_w != im_oriw:
-#             center_x = im_oriw - center_x
-#         else:
-#             center_x = im_w - center_x
-#     grid_x = (center_x / im_w * num_gridx).astype(np.int32)
-#     center_y = (xyxy[:, 1] + xyxy[:, 3]) / 2
-#     grid_y = (center_y / im_h * num_gridy).astype(np.int32)
-#     grid_indices = grid_y * num_gridx + grid_x
-#     grid_weights = grid_indices * img_area + 1.2 * (center_x - grid_x * im_w / num_gridx) + (center_y - grid_y * im_h / num_gridy)
-#     if im_w != im_oriw:
-#         grid_weights[np.where(grid_x >= num_gridx)] += img_area * num_gridy * num_gridx
-
-#     for blk, weight in zip(blk_list, grid_weights):
-#         blk.sort_weight = weight
-#     blk_list.sort(key=lambda blk: blk.sort_weight)
-#     return blk_list
-
-# # TODO: Make these cached_properties
-# def examine_textblk(blk: TextBlock, im_w: int, im_h: int, sort: bool = False) -> None:
-#     lines = blk.lines_array()
-#     middle_pnts = (lines[:, [1, 2, 3, 0]] + lines) / 2
-#     vec_v = middle_pnts[:, 2] - middle_pnts[:, 0]   # vertical vectors of textlines
-#     vec_h = middle_pnts[:, 1] - middle_pnts[:, 3]   # horizontal vectors of textlines
-#     # if sum of vertical vectors is longer, then text orientation is vertical, and vice versa.
-#     center_pnts = (lines[:, 0] + lines[:, 2]) / 2
-#     v = np.sum(vec_v, axis=0)
-#     h = np.sum(vec_h, axis=0)
-#     norm_v, norm_h = np.linalg.norm(v), np.linalg.norm(h)
-#     if blk.language == 'ja':
-#         vertical = norm_v > norm_h
-#     else:
-#         vertical = norm_v > norm_h * 2
-#     # calculate distance between textlines and origin
-#     if vertical:
-#         primary_vec, primary_norm = v, norm_v
-#         distance_vectors = center_pnts - np.array([[im_w, 0]], dtype=np.float64)   # vertical manga text is read from right to left, so origin is (imw, 0)
-#         font_size = int(round(norm_h / len(lines)))
-#     else:
-#         primary_vec, primary_norm = h, norm_h
-#         distance_vectors = center_pnts - np.array([[0, 0]], dtype=np.float64)
-#         font_size = int(round(norm_v / len(lines)))
-
-#     rotation_angle = int(math.atan2(primary_vec[1], primary_vec[0]) / math.pi * 180)     # rotation angle of textlines
-#     distance = np.linalg.norm(distance_vectors, axis=1)     # distance between textlinecenters and origin
-#     rad_matrix = np.arccos(np.einsum('ij, j->i', distance_vectors, primary_vec) / (distance * primary_norm))
-#     distance = np.abs(np.sin(rad_matrix) * distance)
-#     blk.lines = lines.astype(np.int32).tolist()
-#     blk.distance = distance
-#     blk.angle = rotation_angle
-#     if vertical:
-#         blk.angle -= 90
-#     if abs(blk.angle) < 3:
-#         blk.angle = 0
-#     blk.font_size = font_size
-#     blk.vertical = vertical
-#     blk.vec = primary_vec
-#     blk.norm = primary_norm
-#     if sort:
-#         blk.sort_lines()
-
-# def try_merge_textline(blk: TextBlock, blk2: TextBlock, fntsize_tol=1.4, distance_tol=2) -> bool:
-#     if blk2.merged:
-#         return False
-#     fntsize_div = blk.font_size / blk2.font_size
-#     num_l1, num_l2 = len(blk), len(blk2)
-#     fntsz_avg = (blk.font_size * num_l1 + blk2.font_size * num_l2) / (num_l1 + num_l2)
-#     vec_prod = blk.vec @ blk2.vec
-#     vec_sum = blk.vec + blk2.vec
-#     cos_vec = vec_prod / blk.norm / blk2.norm
-#     distance = blk2.distance[-1] - blk.distance[-1]
-#     distance_p1 = np.linalg.norm(np.array(blk2.lines[-1][0]) - np.array(blk.lines[-1][0]))
-#     l1, l2 = Polygon(blk.lines[-1]), Polygon(blk2.lines[-1])
-#     if not l1.intersects(l2):
-#         if fntsize_div > fntsize_tol or 1 / fntsize_div > fntsize_tol:
-#             return False
-#         if abs(cos_vec) < 0.866:   # cos30
-#             return False
-#         # if distance > distance_tol * fntsz_avg or distance_p1 > fntsz_avg * 2.5:
-#         if distance > distance_tol * fntsz_avg:
-#             return False
-#         if blk.vertical and blk2.vertical and distance_p1 > fntsz_avg * 2.5:
-#             return False
-#     # merge
-#     blk.lines.append(blk2.lines[0])
-#     blk.vec = vec_sum
-#     blk.angle = int(round(np.rad2deg(math.atan2(vec_sum[1], vec_sum[0]))))
-#     if blk.vertical:
-#         blk.angle -= 90
-#     blk.norm = np.linalg.norm(vec_sum)
-#     blk.distance = np.append(blk.distance, blk2.distance[-1])
-#     blk.font_size = fntsz_avg
-#     blk2.merged = True
-#     return True
-
-# def merge_textlines(blk_list: List[TextBlock]) -> List[TextBlock]:
-#     if len(blk_list) < 2:
-#         return blk_list
-#     blk_list.sort(key=lambda blk: blk.distance[0])
-#     merged_list = []
-#     for ii, current_blk in enumerate(blk_list):
-#                     continue
-#             xywh = np.array([[bx1, by1, bx2-bx1, by2-by1]])
-#             blk.lines = xywh2xyxypoly(xywh).reshape(-1, 4, 2).tolist()
-#         examine_textblk(blk, im_w, im_h, sort=True)
-
-#         # split manga text if there is a distance gap
-#         textblock_splitted = False
-#         if len(blk.lines) > 1:
-#             if blk.language == 'ja':
-#                 textblock_splitted = True
-#             elif blk.vertical:
-#                 textblock_splitted = True
-#         if textblock_splitted:
-#             textblock_splitted, sub_blk_list = split_textblk(blk)
-#         else:
-#             sub_blk_list = [blk]
-#         # modify textblock to fit its textlines
-#         if not textblock_splitted:
-#             for blk in sub_blk_list:
-#                 blk.adjust_bbox(with_bbox=True)
-#         final_blk_list += sub_blk_list
-
-#     # step3: merge scattered lines, sort textblocks by "grid"
-#     final_blk_list += merge_textlines(scattered_lines['hor'])
-#     final_blk_list += merge_textlines(scattered_lines['ver'])
-#     if sort_blklist:
-#         final_blk_list = sort_textblk_list(final_blk_list, im_w, im_h)
-
-#     for blk in final_blk_list:
-#         if blk.language != 'ja' and not blk.vertical:
-#             num_lines = len(blk.lines)
-#             if num_lines == 0:
-#                 continue
-#             # blk.line_spacing = blk.bounding_rect()[3] / num_lines / blk.font_size
-#             expand_size = max(int(blk.font_size * 0.1), 3)
-#             rad = np.deg2rad(blk.angle)
-#             shifted_vec = np.array([[[-1, -1],[1, -1],[1, 1],[-1, 1]]])
-#             shifted_vec = shifted_vec * np.array([[[np.sin(rad), np.cos(rad)]]]) * expand_size
-#             lines = blk.lines_array() + shifted_vec
-#             lines[..., 0] = np.clip(lines[..., 0], 0, im_w-1)
-#             lines[..., 1] = np.clip(lines[..., 1], 0, im_h-1)
-#             blk.lines = lines.astype(np.int64).tolist()
-#             blk.font_size += expand_size
-
-#     return final_blk_list
 
 
 def visualize_textblocks(canvas: np.ndarray, blk_list: List[TextBlock]):
