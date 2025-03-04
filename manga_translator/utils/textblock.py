@@ -786,8 +786,8 @@ def rearrange_vertical_text_to_horizontal(
         blk for blk in vertical_caption_blocks if not blk.is_rearranged
     ]
 
-    # for blk in result:
-    #     blk.optimize_font_size()
+    for blk in result:
+        blk.maximize_korean_font_size()
 
     return result
 
