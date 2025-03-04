@@ -558,6 +558,7 @@ class TextBlock(object):
 
         logger.debug(f"{self.translation[:4]}: Font size: {self.font_size} => {best_font_size}, Fill ratio: {best_fill_ratio}")
         self.font_size = best_font_size
+        self._alignment = "left"
         return self.font_size
         
     def estimate_text_area(self, font_size: int) -> float:
