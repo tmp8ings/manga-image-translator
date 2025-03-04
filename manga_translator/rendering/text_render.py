@@ -208,7 +208,7 @@ def get_char_glyph(cdpt: str, font_size: int, direction: int) -> Glyph:
             face.set_pixel_sizes(0, font_size)
         elif direction == 1:
             face.set_pixel_sizes(font_size, 0)
-        # logger.debug(f"get_char_glyph: {cdpt}: {font_size}, {direction}")
+        logger.debug(f"get_char_glyph: {cdpt}: {font_size}, {direction}")
         face.load_char(cdpt)
         return Glyph(face.glyph)
 
