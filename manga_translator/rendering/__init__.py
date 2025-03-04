@@ -192,7 +192,7 @@ def render(
         # logger.debug(
         #     f'font_size {region.font_size}, translation {region.get_translation_for_rendering()[:3]}, norm_h {norm_h[0]}, norm_v {norm_v[0]}, alignment {region.alignment}, direction {region.direction == "hr"}, fg {fg}, bg {bg}, target_lang {region.target_lang}, hyphenate {hyphenate}, line_spacing {line_spacing}'
         # )
-        region.maximize_korean_font_size()
+        # region.maximize_korean_font_size()
         temp_box = text_render.put_text_horizontal(
             region.font_size,
             region.get_translation_for_rendering(),
