@@ -412,7 +412,6 @@ def calc_horizontal(font_size: int, text: str, max_width: int, max_height: int, 
     #         max_height *= multiplier
     #     else:
     #         break
-    max_lines = max_height // font_size + 1
 
     # Split words into syllables
     syllables = []
