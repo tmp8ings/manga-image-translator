@@ -401,16 +401,16 @@ def calc_horizontal(font_size: int, text: str, max_width: int, max_height: int, 
         word_widths.append(get_string_width(font_size, word))
 
     # Try to increase width usage if a height overflow is unavoidable
-    while True:
-        max_lines = max_height // font_size + 1
-        expected_size = sum(word_widths) + max((len(word_widths) - 1) * whitespace_offset_x - (max_lines - 1) * hyphen_offset_x, 0)
-        max_size = max_width * max_lines
-        if max_size < expected_size:
-            multiplier = np.sqrt(expected_size / max_size)
-            max_width *= max(multiplier, 1.05)
-            max_height *= multiplier
-        else:
-            break
+    # while True:
+    #     max_lines = max_height // font_size + 1
+    #     expected_size = sum(word_widths) + max((len(word_widths) - 1) * whitespace_offset_x - (max_lines - 1) * hyphen_offset_x, 0)
+    #     max_size = max_width * max_lines
+    #     if max_size < expected_size:
+    #         multiplier = np.sqrt(expected_size / max_size)
+    #         max_width *= max(multiplier, 1.05)
+    #         max_height *= multiplier
+    #     else:
+    #         break
 
     # Split words into syllables
     syllables = []
