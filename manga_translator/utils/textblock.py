@@ -504,7 +504,7 @@ class TextBlock(object):
         """재배치 여부 설정 속성"""
         self._is_rearranged = value
 
-    def optimize_font_size(self, min_size=12, target_fill_ratio=0.95):
+    def maximize_korean_font_size(self, min_size: int = 10, target_fill_ratio: float = 0.8) -> int:
         """
         Optimize the font size to better fill the entire text box area, optimized for Korean text.
 
@@ -515,128 +515,88 @@ class TextBlock(object):
         Returns:
             int: The optimized font size
         """
-        # Get box dimensions
-        original_font_size = self.font_size
-        width, height = self.unrotated_size
-        box_area = width * height
+        if not self.translation:
+            return self.font_size
 
-        if not self.translation and not self.text:
-            return original_font_size  # Keep current font size if no text
+        # Calculate box area
+        box_area = self.xywh[2] * self.xywh[3]  # width * height
 
-        text = self.translation if self.translation else self.text
+        if box_area <= 0 :
+            return self.font_size
+        
+        # Initial font size guess (proportional to box height)
+        font_size = max(min_size, int(self.xywh[3] * 0.6))
+        
+        best_font_size = font_size
+        best_fill_ratio = 0.0
+
+        # Binary search for optimal font size
+        left, right = min_size, int(self.xywh[3] * 1.2)  # Upper bound slightly larger than box height
+
+        while left <= right:
+            mid_font_size = (left + right) // 2
+
+            # Estimate text area using current font size
+            estimated_text_area = self.estimate_text_area(mid_font_size)
+
+            if estimated_text_area <= 0:
+                right = mid_font_size - 1
+                continue
+
+            current_fill_ratio = estimated_text_area / box_area
+
+            if current_fill_ratio > best_fill_ratio:
+                best_fill_ratio = current_fill_ratio
+                best_font_size = mid_font_size
+            
+
+            if current_fill_ratio >= target_fill_ratio:
+                left = mid_font_size + 1
+            else:
+                right = mid_font_size - 1
+
+
+        logger.debug(f"{self.text[:4]}: Font size: {self.font_size} => {best_font_size}, Fill ratio: {best_fill_ratio}")
+        self.font_size = best_font_size
+        return self.font_size
+        
+    def estimate_text_area(self, font_size: int) -> float:
+        """
+        Estimates the area that the text will occupy with the given font size.
+        This is a rough estimation based on Korean character properties.
+
+        Args:
+            font_size (int): The font size to use for the estimation.
+
+        Returns:
+            float: The estimated area that the text will occupy.
+        """
+        if not self.translation:
+            return 0.0
+        
+        text = self.get_translation_for_rendering()
+
+        if not text:
+            return 0.0
+
         text_length = len(text)
+        
+        # Basic assumption: each Korean character is roughly square
+        # We add some padding to account for character spacing
+        avg_char_width = font_size * 0.8  
+        avg_char_height = font_size * 0.9
 
-        # Korean character properties
-        korean_char_ratio = 0.9  # Width to height ratio for Korean characters
-        char_space_factor = 1.1  # Space factor between characters
+        # Estimate the number of lines based on available width and character width
+        estimated_line_width = self.xywh[2] 
+        estimated_chars_per_line = max(1, int(estimated_line_width / avg_char_width))
+        estimated_num_lines = (text_length + estimated_chars_per_line - 1) // estimated_chars_per_line
 
-        # Calculate target characters per line based on box dimensions
-        if self.direction.startswith("v"):
-            logger.debug(
-                f"Optimizing vertical Korean font size for {text[:4]}=============="
-            )
-            # For vertical text
-            max_lines = width / (height * 0.15)  # Estimate max columns
-            max_lines = max(
-                1, min(max_lines, text_length)
-            )  # At least 1, at most text_length
+        # Estimate the total text area
+        estimated_text_width = min(estimated_line_width, text_length*avg_char_width)
+        estimated_text_height = estimated_num_lines * avg_char_height
+        estimated_text_area = estimated_text_width * estimated_text_height
 
-            # Calculate characters per line to fill the box
-            chars_per_line = text_length / max_lines
-
-            # Calculate optimal font height to fill vertical space
-            line_height = height / chars_per_line
-            font_size_by_height = int(line_height * 0.95)  # 95% to avoid overflow
-
-            # Calculate optimal font width to fill horizontal space
-            font_size_by_width = int(width / max_lines * 0.95)
-
-            # Use the smaller of the two to ensure text fits
-            font_size = min(font_size_by_height, font_size_by_width)
-
-            logger.debug(
-                f"Vertical: max_lines={max_lines:.1f}, chars_per_line={chars_per_line:.1f}"
-            )
-            logger.debug(
-                f"Font size by height: {font_size_by_height}, by width: {font_size_by_width}"
-            )
-
-        else:
-            logger.debug(
-                f"Optimizing horizontal Korean font size for {text[:4]}=============="
-            )
-            # For horizontal text
-
-            # Calculate optimal font size to fill the entire box area
-            # For Korean text, estimate lines based on character count and box width
-
-            # Estimate optimal font size
-            optimal_area_per_char = box_area / text_length
-            base_font_size = int(
-                math.sqrt(optimal_area_per_char) * 1.2
-            )  # 1.2 is an empirical factor
-
-            # Estimate lines with this font size
-            estimated_chars_per_line = width / (
-                base_font_size * korean_char_ratio * char_space_factor
-            )
-            estimated_lines = math.ceil(text_length / estimated_chars_per_line)
-
-            # Refine font size based on estimated lines
-            font_height = height / (estimated_lines * self.line_spacing)
-            font_width = width / (estimated_chars_per_line * char_space_factor)
-
-            # Convert to font size (smaller of height/width constraints)
-            font_size_by_height = int(font_height * 0.95)  # 95% to avoid overflow
-            font_size_by_width = int(font_width / korean_char_ratio * 0.95)
-
-            # Use the smaller value to ensure text fits in box
-            font_size = min(font_size_by_height, font_size_by_width)
-
-            logger.debug(
-                f"Horizontal: estimated_lines={estimated_lines}, chars_per_line={estimated_chars_per_line:.1f}"
-            )
-            logger.debug(
-                f"Font size by height: {font_size_by_height}, by width: {font_size_by_width}"
-            )
-
-            # For very short text, we can use larger font
-            if text_length < estimated_chars_per_line * 0.7 and estimated_lines == 1:
-                font_size = int(font_size * 1.3)  # Boost for short text
-                logger.debug(f"Short text boost: {font_size}")
-
-        # Apply minimum size constraint
-        font_size = max(min_size, font_size)
-
-        # Boost based on box area and text length
-        area_factor = min(1.0 + (10000 / max(box_area, 1000)), 1.5)
-        text_factor = min(1.0 + (10 / max(text_length, 5)), 1.4)
-        font_size = int(font_size * area_factor * text_factor)
-
-        # Limit maximum size for readability
-        max_reasonable_size = min(
-            height // 2, width // 2, 80
-        )  # Maximum reasonable font size
-        font_size = min(font_size, max_reasonable_size)
-
-        # Special case for very small boxes
-        if box_area < 5000:
-            font_size = max(
-                font_size, min(24, height // 2)
-            )  # Ensure visibility in small boxes
-
-        # For extremely wide or tall boxes, adjust aspect-based size
-        if self.aspect_ratio > 4 or self.aspect_ratio < 0.25:
-            font_size = int(font_size * 0.85)  # Reduce size for extreme aspect ratios
-
-        self.font_size = font_size
-
-        logger.debug(f"Optimized Korean font size: {original_font_size} -> {font_size}")
-        logger.debug(
-            f"Box: {width}x{height}, area: {box_area}, text length: {text_length}"
-        )
-
-        return font_size
+        return estimated_text_area
 
 
 def rotate_polygons(center, polygons, rotation, new_center=None, to_int=True):
