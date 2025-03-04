@@ -505,12 +505,12 @@ class TextBlock(object):
 
     def optimize_font_size(self, min_size=12, target_fill_ratio=0.95):
         """
-        Optimize the font size to better fill the text box, always assuming Korean text.
-
+        Optimize the font size to better fill the entire text box area, optimized for Korean text.
+        
         Args:
             min_size (int): Minimum acceptable font size
             target_fill_ratio (float): Target ratio of text area to box area (0.0-1.0)
-
+            
         Returns:
             int: The optimized font size
         """
@@ -518,114 +518,99 @@ class TextBlock(object):
         original_font_size = self.font_size
         width, height = self.unrotated_size
         box_area = width * height
-
+        
         if not self.translation and not self.text:
             return original_font_size  # Keep current font size if no text
-
+            
         text = self.translation if self.translation else self.text
         text_length = len(text)
-
-        # Always treat text as Korean (CJK)
-        if self.direction.startswith("v"):
-            logger.debug(
-                f"Optimizing vertical Korean font size for {text[:4]}=============="
-            )
-            # For vertical text - Korean characters need more height
-            estimated_chars_per_column = 1.1  # Optimized for Korean
-            text_height = height * 0.95  # Use 95% of height
-            lines_estimate = max(1, round(text_length / estimated_chars_per_column))
-            logger.debug(
-                f"Estimated lines: {lines_estimate}, text height: {text_height}, lines_estimate: {lines_estimate}"
-            )
-
-            # Calculate font size based on available height divided by estimated lines
-            font_size = int(text_height / (lines_estimate * self.line_spacing))
-
-            # Adjust based on width constraints - Korean characters are square-ish
-            char_width = 1.0  # Korean characters are square and need full width
-            width_based_size = int(width / char_width)
-
-            # Take the smaller of the two constraints
-            logger.debug(
-                f"Font size based on height: {font_size}, based on width: {width_based_size}"
-            )
-            font_size = min(font_size, width_based_size)
-            logger.debug(
-                f"result: {font_size}=============================================="
-            )
+        
+        # Korean character properties
+        korean_char_ratio = 0.9  # Width to height ratio for Korean characters
+        char_space_factor = 1.1  # Space factor between characters
+        
+        # Calculate target characters per line based on box dimensions
+        if self.direction.startswith('v'):
+            logger.debug(f"Optimizing vertical Korean font size for {text[:4]}==============")
+            # For vertical text
+            max_lines = width / (height * 0.15)  # Estimate max columns
+            max_lines = max(1, min(max_lines, text_length))  # At least 1, at most text_length
+            
+            # Calculate characters per line to fill the box
+            chars_per_line = text_length / max_lines
+            
+            # Calculate optimal font height to fill vertical space
+            line_height = height / chars_per_line
+            font_size_by_height = int(line_height * 0.95)  # 95% to avoid overflow
+            
+            # Calculate optimal font width to fill horizontal space
+            font_size_by_width = int(width / max_lines * 0.95)
+            
+            # Use the smaller of the two to ensure text fits
+            font_size = min(font_size_by_height, font_size_by_width)
+            
+            logger.debug(f"Vertical: max_lines={max_lines:.1f}, chars_per_line={chars_per_line:.1f}")
+            logger.debug(f"Font size by height: {font_size_by_height}, by width: {font_size_by_width}")
+            
         else:
-            logger.debug(
-                f"Optimizing vertical Korean font size for {text[:4]}=============="
-            )
-            # For horizontal text - Korean specific values
-            avg_char_width = 1.0  # Korean characters are square-ish
-
-            # Korean takes more horizontal space per character than Latin
-            reasonable_width = width * 0.95  # Use 95% of width
-            chars_per_line = reasonable_width / (
-                avg_char_width * 17
-            )  # Adjusted for Korean (larger than 15)
-
-            # Estimate number of lines needed
-            lines_needed = max(1, round(text_length / chars_per_line))
-            logger.debug(
-                f"Estimated lines: {lines_needed}, chars per line: {chars_per_line}"
-            )
-
-            # Calculate height per line
-            line_height = height * 0.98 / (lines_needed * self.line_spacing)
-
-            # Calculate width-based size (horizontal constraint)
-            width_based_size = reasonable_width / (chars_per_line * avg_char_width)
+            logger.debug(f"Optimizing horizontal Korean font size for {text[:4]}==============")
+            # For horizontal text
             
-            logger.debug(
-                f"Font size based on height: {line_height}, based on width: {width_based_size}"
-            )
-
-            # Use the smaller of height and width constraints
-            # For Korean, prioritize height slightly more for better readability
-            font_size = min(
-                int(line_height * 1.05), int(width_based_size * target_fill_ratio)
-            )
-            logger.debug(
-                f"result: {font_size}=============================================="
-            )
-
-            # Boost size for short text that can fit in one line
-            if text_length <= chars_per_line * 0.7:  # Stricter for Korean (0.7 vs 0.8)
-                font_size = int(line_height * 1.4)  # Larger boost for Korean
-                logger.debug(
-                    f"Short text boost: {font_size}=============================================="
-                )
+            # Calculate optimal font size to fill the entire box area
+            # For Korean text, estimate lines based on character count and box width
             
-            logger.debug(
-                f"result: {font_size}=============================================="
-            )
-
+            # Estimate optimal font size
+            optimal_area_per_char = box_area / text_length
+            base_font_size = int(math.sqrt(optimal_area_per_char) * 1.2)  # 1.2 is an empirical factor
+            
+            # Estimate lines with this font size
+            estimated_chars_per_line = width / (base_font_size * korean_char_ratio * char_space_factor)
+            estimated_lines = math.ceil(text_length / estimated_chars_per_line)
+            
+            # Refine font size based on estimated lines
+            font_height = height / (estimated_lines * self.line_spacing)
+            font_width = width / (estimated_chars_per_line * char_space_factor)
+            
+            # Convert to font size (smaller of height/width constraints)
+            font_size_by_height = int(font_height * 0.95)  # 95% to avoid overflow
+            font_size_by_width = int(font_width / korean_char_ratio * 0.95)
+            
+            # Use the smaller value to ensure text fits in box
+            font_size = min(font_size_by_height, font_size_by_width)
+            
+            logger.debug(f"Horizontal: estimated_lines={estimated_lines}, chars_per_line={estimated_chars_per_line:.1f}")
+            logger.debug(f"Font size by height: {font_size_by_height}, by width: {font_size_by_width}")
+            
+            # For very short text, we can use larger font
+            if text_length < estimated_chars_per_line * 0.7 and estimated_lines == 1:
+                font_size = int(font_size * 1.3)  # Boost for short text
+                logger.debug(f"Short text boost: {font_size}")
+        
         # Apply minimum size constraint
         font_size = max(min_size, font_size)
-
-        # Apply a boost factor to make text larger - adjusted for Korean readability
-        boost_factor = (
-            1.6 if text_length < 10 else 1.3
-        )  # Higher boost factors for Korean
-        font_size = int(font_size * boost_factor)
-
-        # Additional boost for very small boxes (likely containing short text)
-        if box_area < 10000:  # Small text box threshold
-            font_size = int(font_size * 1.3)
-
-        # Final adjustment based on aspect ratio
-        if self.aspect_ratio > 3 or self.aspect_ratio < 0.3:
-            # Extreme aspect ratios (very wide or very tall)
-            font_size = int(font_size * 0.85)  # Reduce size for better fit
-
+        
+        # Boost based on box area and text length
+        area_factor = min(1.0 + (10000 / max(box_area, 1000)), 1.5)
+        text_factor = min(1.0 + (10 / max(text_length, 5)), 1.4)
+        font_size = int(font_size * area_factor * text_factor)
+        
+        # Limit maximum size for readability
+        max_reasonable_size = min(height // 2, width // 2, 80)  # Maximum reasonable font size
+        font_size = min(font_size, max_reasonable_size)
+        
+        # Special case for very small boxes
+        if box_area < 5000:
+            font_size = max(font_size, min(24, height // 2))  # Ensure visibility in small boxes
+        
+        # For extremely wide or tall boxes, adjust aspect-based size
+        if self.aspect_ratio > 4 or self.aspect_ratio < 0.25:
+            font_size = int(font_size * 0.85)  # Reduce size for extreme aspect ratios
+        
         self.font_size = font_size
-
-        logger.debug(f"Optimized Korean font size for {text}")
-        logger.debug(
-            f"{original_font_size} -> {font_size} (w:{width}, h:{height}, len:{text_length})"
-        )
+        
+        logger.debug(f"Optimized Korean font size: {original_font_size} -> {font_size}")
+        logger.debug(f"Box: {width}x{height}, area: {box_area}, text length: {text_length}")
+        
         return font_size
 
 
