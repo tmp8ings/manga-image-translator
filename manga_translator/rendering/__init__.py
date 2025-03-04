@@ -122,18 +122,34 @@ async def dispatch(
     text_regions = list(filter(lambda region: region.translation, text_regions))
 
     log_text = "\n".join([str(i) for i in text_regions])
-    logger.debug(f"text_regions before rearrange: {log_text}")
+    # logger.debug(f"text_regions before rearrange: {log_text}")
+    logger.debug(f"font_size_before_rearrange:")
+    for text_region in text_regions:
+        logger.debug(
+            f"font_size {text_region.font_size}, translation {text_region.translation[:3]}"
+        )
     try:
         text_regions = rearrange_vertical_text_to_horizontal(text_regions, img)
     except Exception as e:
         logger.error(f"Error while rearranging text: {e}", exc_info=True)
     log_text = "\n".join([str(i) for i in text_regions])
-    logger.debug(f"text_regions after rearrange: {log_text}")
+    # logger.debug(f"text_regions after rearrange: {log_text}")
 
+    logger.debug(f"font_size_after_rearrange:")
+    for text_region in text_regions:
+        logger.debug(
+            f"font_size {text_region.font_size}, translation {text_region.translation[:3]}"
+        )
     # Resize regions that are too small
     dst_points_list = resize_regions_to_font_size(
         img, text_regions, font_size_fixed, font_size_offset, font_size_minimum
     )
+    
+    logger.debug(f"font_size_after_resize:")
+    for text_region in text_regions:
+        logger.debug(
+            f"font_size {text_region.font_size}, translation {text_region.translation[:3]}"
+        )
 
     # TODO: Maybe remove intersections
 

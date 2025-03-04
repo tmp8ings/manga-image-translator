@@ -556,7 +556,7 @@ class TextBlock(object):
                 right = mid_font_size - 1
 
 
-        logger.debug(f"{self.text[:4]}: Font size: {self.font_size} => {best_font_size}, Fill ratio: {best_fill_ratio}")
+        logger.debug(f"{self.translation[:4]}: Font size: {self.font_size} => {best_font_size}, Fill ratio: {best_fill_ratio}")
         self.font_size = best_font_size
         return self.font_size
         
@@ -786,7 +786,7 @@ def rearrange_vertical_text_to_horizontal(
         blk for blk in vertical_caption_blocks if not blk.is_rearranged
     ]
 
-    for blk in result:
+    for blk in vertical_caption_blocks:
         blk.maximize_korean_font_size()
 
     return result
