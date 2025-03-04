@@ -126,7 +126,7 @@ async def dispatch(
     logger.debug(f"font_size_before_rearrange:")
     for text_region in text_regions:
         logger.debug(
-            f"font_size {text_region.font_size}, translation {text_region.translation[:3]}"
+            f"font_size {text_region.font_size}, translation {text_region.translation[:3]}, width: {text_region.xywh}"
         )
     try:
         text_regions = rearrange_vertical_text_to_horizontal(text_regions, img)
@@ -138,7 +138,7 @@ async def dispatch(
     logger.debug(f"font_size_after_rearrange:")
     for text_region in text_regions:
         logger.debug(
-            f"font_size {text_region.font_size}, translation {text_region.translation[:3]}"
+            f"font_size {text_region.font_size}, translation {text_region.translation[:3]}, width: {text_region.xywh}"
         )
     # Resize regions that are too small
     dst_points_list = resize_regions_to_font_size(
