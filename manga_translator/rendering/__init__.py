@@ -73,8 +73,6 @@ def resize_regions_to_font_size(
         # Otherwise no need to increase fontsize
 
         # Infer the target fontsize
-        # TODO: check why font size is decreased
-        logger.debug(f"{region.translation[:3]}: region.font_size {region.font_size}, font_size_fixed {font_size_fixed}, font_size_offset {font_size_offset}, font_size_minimum {font_size_minimum}")
         target_font_size = region.font_size
         if font_size_fixed is not None:
             target_font_size = font_size_fixed
