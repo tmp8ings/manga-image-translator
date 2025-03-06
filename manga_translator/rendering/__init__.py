@@ -157,10 +157,6 @@ async def dispatch(
     for region, dst_points in tqdm(
         zip(text_regions, dst_points_list), "[render]", total=len(text_regions)
     ):
-        if config.render.alignment:
-            region._alignment = config.render.alignment
-        if config.render.direction:
-            region._direction = config.render.direction
         if render_mask is not None:
             # set render_mask to 1 for the region that is inside dst_points
             cv2.fillConvexPoly(render_mask, dst_points.astype(np.int32), 1)
