@@ -709,10 +709,8 @@ class MangaTranslator:
                 translation = translation.upper()
             region.translation = translation
             region.target_lang = config.translator.target_lang
-            if config.render.alignment:
-                region._alignment = config.render.alignment
-            if config.render.direction:
-                region._direction = config.render.direction
+            region._alignment = config.render.alignment
+            region._direction = config.render.direction
 
         # Punctuation correction logic. for translators often incorrectly change quotation marks from the source language to those commonly used in the target language.
         check_items = [
