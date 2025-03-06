@@ -129,7 +129,8 @@ async def dispatch(
             f"font_size {text_region.font_size}, translation {text_region.translation[:3]}, width: {text_region.xywh}"
         )
     try:
-        text_regions = rearrange_vertical_text_to_horizontal(text_regions, img)
+        pass
+        # text_regions = rearrange_vertical_text_to_horizontal(text_regions, img)
     except Exception as e:
         logger.error(f"Error while rearranging text: {e}", exc_info=True)
     log_text = "\n".join([str(i) for i in text_regions])
