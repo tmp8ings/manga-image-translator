@@ -234,6 +234,7 @@ def render(
     # src_pts[:, 1] = np.clip(np.round(src_pts[:, 1]), 0, enlarged_h * 2)
 
     M, _ = cv2.findHomography(src_points, dst_points, cv2.RANSAC, 5.0)
+    logger.debug(f"for {region.translation[:3]}, souce points {src_points}, dst_points {dst_points}")
     rgba_region = cv2.warpPerspective(
         box,
         M,
