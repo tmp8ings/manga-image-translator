@@ -218,14 +218,15 @@ def render(
     r_temp = w / h
 
     # Extend temporary box so that it has same ratio as original
+    # Modified to keep text at the top-left corner instead of centering it
     if r_temp > r_orig:
-        h_ext = int(w / (2 * r_orig) - h / 2)
-        box = np.zeros((h + h_ext * 2, w, 4), dtype=np.uint8)
-        box[h_ext : h + h_ext, 0:w] = temp_box
+        h_ext = int(w / r_orig - h)
+        box = np.zeros((h + h_ext, w, 4), dtype=np.uint8)
+        box[0:h, 0:w] = temp_box  # Text positioned at the top
     else:
-        w_ext = int((h * r_orig - w) / 2)
-        box = np.zeros((h, w + w_ext * 2, 4), dtype=np.uint8)
-        box[0:h, w_ext : w_ext + w] = temp_box
+        w_ext = int(h * r_orig - w)
+        box = np.zeros((h, w + w_ext, 4), dtype=np.uint8)
+        box[0:h, 0:w] = temp_box  # Text positioned at the left
 
     src_points = np.array(
         [[0, 0], [box.shape[1], 0], [box.shape[1], box.shape[0]], [0, box.shape[0]]]
@@ -233,7 +234,8 @@ def render(
     # src_pts[:, 0] = np.clip(np.round(src_pts[:, 0]), 0, enlarged_w * 2)
     # src_pts[:, 1] = np.clip(np.round(src_pts[:, 1]), 0, enlarged_h * 2)
 
-    M, _ = cv2.findHomography(src_points, dst_points, cv2.RANSAC, 5.0)
+    # Add the missing perspective transform calculation
+    M = cv2.getPerspectiveTransform(src_points, dst_points.astype(np.float32))
     logger.debug(f"for {region.translation[:3]}, souce points {src_points}, dst_points {dst_points}")
     rgba_region = cv2.warpPerspective(
         box,
