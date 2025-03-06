@@ -713,6 +713,7 @@ def put_text_horizontal(font_size: int, text: str, width: int, height: int, alig
 
     # write stuff
     for line_text, line_width in zip(line_text_list, line_width_list):
+        logger.debug(f"put_text_horizontal - pen_orig: {pen_orig}, line_text: {line_text[:3]}")
         pen_line = pen_orig.copy()
         if alignment == 'center':
             pen_line[0] += (max(line_width_list) - line_width) // 2 * (-1 if reversed_direction else 1)
