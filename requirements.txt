@@ -59,3 +59,4 @@ paddlepaddle; sys_platform == 'darwin'
 paddlepaddle-gpu; sys_platform != 'darwin'
 google-generativeai
 httpx
+janome
