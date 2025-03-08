@@ -125,6 +125,7 @@ class GeminiTranslator(ConfigGPT, CommonTranslator):
             try:
                 response_text = await self._request_translation(to_lang, prompt[0])
                 translations = self._parse_response(response_text, queries)
+                self.save_to_chat_sample(to_lang, "\n".join(queries), translations)
                 return translations
             except Exception as e:
                 self.logger.warning(
@@ -133,6 +134,9 @@ class GeminiTranslator(ConfigGPT, CommonTranslator):
                 if attempt == self._RETRY_ATTEMPTS - 1:
                     raise
                 await asyncio.sleep(1)
+        
+
+        
         return translations
 
     def _parse_response(self, response: str, queries: List[str]) -> List[str]:
@@ -159,6 +163,9 @@ class GeminiTranslator(ConfigGPT, CommonTranslator):
         # Build messages using dictionaries instead of Content objects
         messages = []
         if to_lang in self.chat_sample:
+            self.logger.debug(
+                f"Using chat sample for {to_lang}: {self.chat_sample[to_lang]}"
+            )
             messages.append(
                 {"role": "user", "parts": [{"text": self.chat_sample[to_lang][0]}]}
             )

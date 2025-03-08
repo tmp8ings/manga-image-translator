@@ -1,5 +1,5 @@
 import re
-from typing import List, Dict
+from typing import List, Dict, Tuple
 from omegaconf import OmegaConf
 
 class ConfigGPT:
@@ -130,3 +130,241 @@ class ConfigGPT:
         )
         
         return extracted_text.strip() if extracted_text else None
+
+    def save_to_chat_sample(self, language: str, source_text: str, translated_text: str):
+        """
+        Save recent translation results to _CHAT_SAMPLE for future reference.
+        Process involves:
+        1. Remove all <|n|> markers from existing and new samples
+        2. Combine texts without markers, removing duplicates
+        3. Automatically determine and apply appropriate line limit
+        4. Re-add <|n|> markers to the processed result
+        
+        Args:
+            language: Target language name (e.g., 'English', 'Simplified Chinese')
+            source_text: The source text with <|n|> markers
+            translated_text: The translated text with <|n|> markers
+            
+        Returns:
+            bool: True if the operation was successful, False otherwise
+        """
+        # Get existing samples or initialize if not present
+        existing_source = ""
+        existing_translation = ""
+        if language in self._CHAT_SAMPLE:
+            existing_source = self._CHAT_SAMPLE[language][0]
+            existing_translation = self._CHAT_SAMPLE[language][1]
+        
+        # Step 1: Remove markers from both existing and new samples
+        clean_existing_source = self._remove_markers(existing_source)
+        clean_existing_translation = self._remove_markers(existing_translation)
+        clean_new_source = self._remove_markers(source_text)
+        clean_new_translation = self._remove_markers(translated_text)
+        
+        # Step 2: Combine texts without markers, removing duplicates
+        combined_source, combined_translation = self._combine_text_pairs_without_duplicates(
+            clean_existing_source, clean_existing_translation,
+            clean_new_source, clean_new_translation
+        )
+        
+        # Step 3: Get line limit based on character count
+        line_limit = self._get_line_limit(combined_source, combined_translation)
+        
+        # Apply the same line limit to both texts
+        limited_source = self._limit_lines(combined_source, line_limit)
+        limited_translation = self._limit_lines(combined_translation, line_limit)
+        
+        # Step 4: Re-add markers
+        processed_source = self._add_markers(limited_source)
+        processed_translation = self._add_markers(limited_translation)
+        
+        # Update the chat sample dictionary
+        if language not in self._CHAT_SAMPLE:
+            self._CHAT_SAMPLE[language] = ["", ""]
+        
+        self._CHAT_SAMPLE[language] = [processed_source, processed_translation]
+        
+        return True
+    
+    def _combine_text_pairs_without_duplicates(
+            self, 
+            existing_source: str, 
+            existing_translation: str,
+            new_source: str, 
+            new_translation: str
+        ) -> Tuple[str, str]:
+        """
+        Combine source and translation texts while removing duplicates.
+        When a source line is a duplicate, both the source line and its corresponding
+        translation line are excluded from the result.
+        
+        Args:
+            existing_source: Existing source text without markers
+            existing_translation: Existing translation text without markers
+            new_source: New source text without markers
+            new_translation: New translation text without markers
+            
+        Returns:
+            Tuple[str, str]: Combined source and translation texts without duplicates
+        """
+        # Split texts into lines
+        existing_source_lines = existing_source.split('\n') if existing_source else []
+        existing_translation_lines = existing_translation.split('\n') if existing_translation else []
+        new_source_lines = new_source.split('\n') if new_source else []
+        new_translation_lines = new_translation.split('\n') if new_translation else []
+        
+        # Ensure alignment between source and translation lines
+        existing_pairs = list(zip(existing_source_lines, existing_translation_lines))
+        if len(existing_source_lines) > len(existing_translation_lines):
+            existing_pairs = existing_pairs[:len(existing_translation_lines)]
+        elif len(existing_translation_lines) > len(existing_source_lines):
+            existing_pairs = [(src, tran) for src, tran in existing_pairs if src.strip()]
+            
+        new_pairs = list(zip(new_source_lines, new_translation_lines))
+        if len(new_source_lines) > len(new_translation_lines):
+            new_pairs = new_pairs[:len(new_translation_lines)]
+        elif len(new_translation_lines) > len(new_source_lines):
+            new_pairs = [(src, tran) for src, tran in new_pairs if src.strip()]
+        
+        # Keep track of seen source lines to avoid duplicates
+        seen_sources = set()
+        combined_pairs = []
+        
+        # Process existing pairs first
+        for src, tran in existing_pairs:
+            if src.strip():  # Skip empty lines
+                if src not in seen_sources:
+                    seen_sources.add(src)
+                    combined_pairs.append((src, tran))
+        
+        # Process new pairs, skipping duplicates
+        for src, tran in new_pairs:
+            if src.strip():  # Skip empty lines
+                if src not in seen_sources:
+                    seen_sources.add(src)
+                    combined_pairs.append((src, tran))
+        
+        # Extract source and translation lines from combined pairs
+        combined_source_lines = [pair[0] for pair in combined_pairs]
+        combined_translation_lines = [pair[1] for pair in combined_pairs]
+        
+        # Join lines into texts
+        combined_source = '\n'.join(combined_source_lines)
+        combined_translation = '\n'.join(combined_translation_lines)
+        
+        return combined_source, combined_translation
+    
+    def _get_line_limit(self, source_text: str, translated_text: str) -> int:
+        """
+        Determine an appropriate line limit based on character count and
+        ensure both source and translation will have the same line count.
+        
+        Args:
+            source_text: Source text without markers
+            translated_text: Translated text without markers
+            
+        Returns:
+            int: Calculated line limit that works for both texts
+        """
+        # Constants for limiting
+        MAX_CHARS = 4000  # Maximum total characters we want to keep
+        MIN_LINES = 3     # Minimum number of lines to keep
+        MAX_LINES = 30    # Maximum number of lines to keep
+        
+        # Get line counts
+        source_lines = source_text.split('\n')
+        translation_lines = translated_text.split('\n')
+        source_line_count = len(source_lines)
+        translation_line_count = len(translation_lines)
+        
+        # Calculate total character count
+        total_chars = len(source_text) + len(translated_text)
+        
+        # Determine a reasonable line limit based on character count
+        if total_chars <= MAX_CHARS / 2:
+            # If text is relatively small, allow more lines
+            char_based_limit = MAX_LINES
+        else:
+            # Scale down line limit as character count increases
+            ratio = MAX_CHARS / max(total_chars, 1)
+            char_based_limit = max(MIN_LINES, min(MAX_LINES, int(MAX_LINES * ratio)))
+        
+        # Find common line count: take minimum of source lines, translation lines, and char-based limit
+        # This ensures both source and translation will have the same number of lines
+        common_limit = min(source_line_count, translation_line_count, char_based_limit)
+        
+        return common_limit
+    
+    def _remove_markers(self, text):
+        """
+        Remove all <|n|> markers from text.
+        
+        Args:
+            text: Text with <|n|> markers
+        
+        Returns:
+            str: Text with markers removed
+        """
+        # Replace markers with empty string
+        clean_text = re.sub(r'<\|\d+\|>', '', text)
+        return clean_text.strip()
+    
+    def _limit_lines(self, text, line_limit):
+        """
+        Limit text to specified number of lines.
+        
+        Args:
+            text: Text to limit
+            line_limit: Maximum number of lines
+        
+        Returns:
+            str: Limited text
+        """
+        lines = text.split('\n')
+        if len(lines) > line_limit:
+            return '\n'.join(lines[-line_limit:])  # Keep the most recent lines
+        return text
+    
+    def _add_markers(self, text):
+        """
+        Add <|n|> markers to each line of text.
+        
+        Args:
+            text: Text without markers
+        
+        Returns:
+            str: Text with <|n|> markers added
+        """
+        lines = text.split('\n')
+        marked_text = ""
+        for i, line in enumerate(lines, 1):
+            if line.strip():  # Skip empty lines
+                marked_text += f"<|{i}|>{line}\n"
+        return marked_text.rstrip()
+    
+    def _process_text(self, text):
+        """
+        Process text by removing <|n|> markers, then re-adding them.
+        
+        Args:
+            text: Text with <|n|> markers
+        
+        Returns:
+            str: Processed text with normalized <|n|> markers
+        """
+        # Extract segments with their ID and content
+        segments = []
+        for match in re.finditer(r'<\|(\d+)\|>(.*?)(?=<\|\d+\|>|$)', text, re.DOTALL):
+            segment_id = match.group(1)
+            content = match.group(2).strip()
+            segments.append((int(segment_id), content))
+        
+        # Sort segments by ID
+        segments.sort(key=lambda x: x[0])
+        
+        # Re-format with <|n|> markers
+        processed_text = ""
+        for idx, content in segments:
+            processed_text += f"<|{idx}|>{content}\n"
+        
+        return processed_text.rstrip()
