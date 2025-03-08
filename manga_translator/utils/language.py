@@ -1,9 +1,13 @@
 import re
 from typing import List
+from manga_translator.utils.log import get_logger
 from manga_translator.utils.textblock import TextBlock
 from janome.tokenizer import Tokenizer
 
-# 모듈 레벨에서 토크나이저 한 번만 초기화
+
+logger = get_logger(__name__)
+
+
 tokenizer = Tokenizer()
 
 def is_japanese_onomatopoeia(text: str) -> bool:
@@ -78,8 +82,9 @@ def is_japanese_onomatopoeia(text: str) -> bool:
     return False
 
 def is_onomatopoeia(text: str):
-    # TODO: Implement a better way to detect onomatopoeia
-    return is_japanese_onomatopoeia(text)
+    result = is_japanese_onomatopoeia(text)
+    logger.debug(f"Text: {text}, Is Onomatopoeia: {result}")
+    return result
 
 def filter_onomatopoeia(text_blocks: List[TextBlock]):
-    return list(filter(lambda tb: not is_onomatopoeia(tb.text), text_blocks))
+    return [tb for tb in text_blocks if not is_onomatopoeia(tb.text)]
