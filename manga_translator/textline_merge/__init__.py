@@ -208,7 +208,7 @@ async def dispatch(textlines: List[Quadrilateral], width: int, height: int, verb
             angle = 0
         lines = [txtln.pts for txtln in txtlns]
         texts = [txtln.text for txtln in txtlns]
-        logger.debug(f"font size at textline merge({texts[0][:3]}): {font_size}. with max: {max_font_size}")
+        # logger.debug(f"font size at textline merge({texts[0][:3]}): {font_size}. with max: {max_font_size}")
         region = TextBlock(lines, texts, font_size=font_size, angle=angle, prob=np.exp(total_logprobs),
                            fg_color=fg_color, bg_color=bg_color)
         text_regions.append(region)
