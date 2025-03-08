@@ -82,4 +82,4 @@ def is_onomatopoeia(text: str):
     return is_japanese_onomatopoeia(text)
 
 def filter_onomatopoeia(text_blocks: List[TextBlock]):
-    return filter(lambda tb: not is_onomatopoeia(tb.text), text_blocks)
+    return list(filter(lambda tb: not is_onomatopoeia(tb.text), text_blocks))

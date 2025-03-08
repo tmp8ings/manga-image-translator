@@ -304,9 +304,9 @@ class MangaTranslator:
         # -- Textline merge
         await self._report_progress("textline_merge")
         ctx.text_regions = await self._run_textline_merge(config, ctx)
-        logger.info(f"Text regions after merge: {map(lambda x: x.text[:3], ctx.text_regions)}")
+        logger.info(f"Text regions after merge: {list(map(lambda x: x.text[:3], ctx.text_regions))}")
         ctx.text_regions = filter_onomatopoeia(ctx.text_regions)
-        logger.info(f"Text regions after filter: {map(lambda x: x.text[:3], ctx.text_regions)}")
+        logger.info(f"Text regions after filter: {list(map(lambda x: x.text[:3], ctx.text_regions))}")
 
         if self.verbose:
             bboxes = visualize_textblocks(
