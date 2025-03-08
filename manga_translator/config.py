@@ -179,6 +179,8 @@ class RenderConfig(BaseModel):
     """Use fixed font size for rendering"""
     _font_color_fg = None
     _font_color_bg = None
+    expand_box_width_ratio: float = 2.0
+    """Expand the width of the text box by this ratio. Default is 1.0, which means no expansion. 0.5 means half the width, 2.0 means double the width."""
     @property
     def font_color_fg(self):
         if self.font_color and not self._font_color_fg:

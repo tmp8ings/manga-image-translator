@@ -1,3 +1,4 @@
+import math
 import os
 import cv2
 from manga_translator.config import Config
@@ -103,6 +104,47 @@ def resize_regions_to_font_size(
         dst_points_list.append(dst_points)
     return dst_points_list
 
+def expand_text_box(region: TextBlock, expand_box_width_ratio: float):
+    """
+    Expand the text box width by a certain ratio along the text direction.
+    
+    Args:
+        region: TextBlock to expand
+        expand_box_width_ratio: Ratio by which to expand the width
+    """
+    if expand_box_width_ratio <= 0 or math.isclose(expand_box_width_ratio, 1.0):
+        return  # No change needed
+    
+    logger.debug(f"Expanding text box by ratio {expand_box_width_ratio} for {region.translation[:10]}")
+    
+    # Determine expansion direction based on text direction
+    expand_horizontally = region.horizontal  # This checks if direction starts with 'h'
+    
+    # For each line (polygon) in the region
+    for i in range(len(region.lines)):
+        line = region.lines[i]
+        
+        # Create a shapely Polygon from the line points
+        poly = Polygon(line)
+        
+        # Apply scaling based on text direction
+        if expand_horizontally:
+            # For horizontal text, expand horizontally
+            scaled_poly = affinity.scale(poly, xfact=expand_box_width_ratio, yfact=1, origin='center')
+        else:
+            # For vertical text, expand vertically
+            scaled_poly = affinity.scale(poly, xfact=1, yfact=expand_box_width_ratio, origin='center')
+        
+        # Extract the exterior coordinates of the scaled polygon
+        coords = np.array(scaled_poly.exterior.coords)
+        
+        # Remove the last point which is a duplicate of the first in shapely polygons
+        if np.array_equal(coords[0], coords[-1]):
+            coords = coords[:-1]
+        
+        # Update the line with the scaled coordinates
+        region.lines[i] = coords.astype(np.int32)
+
 
 async def dispatch(
     config: Config,
@@ -120,6 +162,8 @@ async def dispatch(
 
     text_render.set_font(font_path)
     text_regions = list(filter(lambda region: region.translation, text_regions))
+    for region in text_regions:
+        expand_text_box(region, config.render.expand_box_width_ratio)
 
     log_text = "\n".join([str(i) for i in text_regions])
     # logger.debug(f"text_regions before rearrange: {log_text}")
