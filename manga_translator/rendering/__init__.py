@@ -129,6 +129,9 @@ def is_in_speech_balloon(region: TextBlock, img: np.ndarray) -> bool:
 
 
 def is_expand_needed(region: TextBlock, img: np.ndarray) -> bool:
+    # log every elements that can effect the decision
+    logger.debug(f"region {region.translation[:3]}({len(region.translation[:3])}): font size: {region.font_size}, unrotated_size: {region.unrotated_size}")
+    
     # Do not expand if region is vertical.
     if region.vertical:
         logger.debug(f"region {region.translation[:3]} is vertical")
@@ -138,7 +141,7 @@ def is_expand_needed(region: TextBlock, img: np.ndarray) -> bool:
         logger.debug(f"region {region.translation[:3]} is short")
         return False
     # Do not expand if the line is already wide enough.
-    char_per_line = region.unrotated_size[1] // region.font_size
+    char_per_line = region.unrotated_size[0] // region.font_size
     if char_per_line > 10:
         logger.debug(f"region {region.translation[:3]} has enough characters per line - {char_per_line}, font_size {region.font_size}, unrotated_size {region.unrotated_size}")
         return False
