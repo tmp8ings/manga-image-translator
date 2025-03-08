@@ -140,13 +140,19 @@ def is_expand_needed(region: TextBlock, img: np.ndarray) -> bool:
     # Do not expand if the line is already wide enough.
     char_per_line = region.unrotated_size[1] // region.font_size
     if char_per_line > 10:
-        logger.debug(f"region {region.translation[:3]} has enough characters per line")
+        logger.debug(f"region {region.translation[:3]} has enough characters per line - {char_per_line}, font_size {region.font_size}, unrotated_size {region.unrotated_size}")
         return False
     # Do not expand if region is inside a speech balloon.
     if is_in_speech_balloon(region, img):
         logger.debug(f"region {region.translation[:3]} is in a speech balloon")
         return False
-    return True
+    
+    # 텍스트 박스의 모양이 세로로 긴 형태일 때 True 리턴
+    if region.unrotated_size[1] > region.unrotated_size[0] * 2:
+        logger.debug(f"region {region.translation[:3]} is long")
+        return True
+
+    return False
 
 
 def expand_text_boxes(
