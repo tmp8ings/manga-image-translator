@@ -247,9 +247,12 @@ async def dispatch(
 
     text_render.set_font(font_path)
     text_regions = list(filter(lambda region: region.translation.strip(), text_regions))
+    
+    logger.debug(f"before expand: {text_regions}")
     text_regions = expand_text_boxes(
         text_regions, config.render.expand_box_width_ratio, img
     )
+    logger.debug(f"after expand: {text_regions}")
 
     log_text = "\n".join([str(i) for i in text_regions])
     # logger.debug(f"text_regions before rearrange: {log_text}")
