@@ -277,6 +277,8 @@ class DetectorConfig(BaseModel):
     """Threshold for bbox generation"""
     unclip_ratio: float = 2.3
     """How much to extend text skeleton to form bounding box"""
+    exclude_onomatopoeia: bool = True
+    """Exclude onomatopoeia from detection."""
 
 class InpainterConfig(BaseModel):
     inpainter: Inpainter = Inpainter.lama_mpe

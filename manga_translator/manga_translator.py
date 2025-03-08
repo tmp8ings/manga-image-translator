@@ -668,6 +668,9 @@ class MangaTranslator:
             text_regions,
             right_to_left=True if config.detector.detector != Detector.ctd else False,
         )
+        
+        if config.detector.exclude_onomatopoeia:
+            text_regions = filter_onomatopoeia(text_regions)
         return text_regions
 
     async def _run_text_translation(self, config: Config, ctx: Context):
