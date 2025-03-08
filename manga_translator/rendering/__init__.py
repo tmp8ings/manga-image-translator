@@ -104,46 +104,131 @@ def resize_regions_to_font_size(
         dst_points_list.append(dst_points)
     return dst_points_list
 
-def expand_text_box(region: TextBlock, expand_box_width_ratio: float):
+
+def is_in_speech_balloon(region: TextBlock, img: np.ndarray) -> bool:
     """
-    Expand the text box width by a certain ratio along the text direction.
-    
-    Args:
-        region: TextBlock to expand
-        expand_box_width_ratio: Ratio by which to expand the width
+    Determine if the text region (based on its bounding box) is inside a speech balloon.
+    Assumes that speech balloons have a high mean brightness and low variance.
+    """
+    x1, y1, x2, y2 = region.xyxy
+    # Clip coordinates to image boundaries
+    x1 = max(0, x1)
+    y1 = max(0, y1)
+    x2 = min(img.shape[1], x2)
+    y2 = min(img.shape[0], y2)
+    if x2 <= x1 or y2 <= y1:
+        return False
+    patch = img[y1:y2, x1:x2]
+    gray = cv2.cvtColor(patch, cv2.COLOR_BGR2GRAY)
+    mean_val = gray.mean()
+    var_val = gray.var()
+    # Heuristic: speech balloons tend to be bright with low variance.
+    if mean_val > 200 and var_val < 50:
+        return True
+    return False
+
+
+def is_expand_needed(region: TextBlock, img: np.ndarray) -> bool:
+    # Do not expand if region is vertical.
+    if region.vertical:
+        return False
+    # Do not expand for short text (7 or fewer characters).
+    if len(region.get_translation_for_rendering()) <= 7:
+        return False
+    # Do not expand if the line is already wide enough.
+    char_per_line = region.unrotated_size[1] // region.font_size
+    if char_per_line > 10:
+        return False
+    # Do not expand if region is inside a speech balloon.
+    if is_in_speech_balloon(region, img):
+        return False
+    return True
+
+
+def expand_text_boxes(
+    regions: List[TextBlock], expand_box_width_ratio: float, img: np.ndarray
+):
+    """
+    Expand text boxes that need expansion (as per is_expand_needed) by scaling their width (for horizontal text)
+    or height (for vertical text) by expand_box_width_ratio. Adjust positions to avoid overlapping and ensure
+    boxes remain within the image boundaries.
     """
     if expand_box_width_ratio <= 0 or math.isclose(expand_box_width_ratio, 1.0):
-        return  # No change needed
-    
-    logger.debug(f"Expanding text box by ratio {expand_box_width_ratio} for {region.translation[:10]}")
-    
-    # Determine expansion direction based on text direction
-    expand_horizontally = region.horizontal  # This checks if direction starts with 'h'
-    
-    # For each line (polygon) in the region
-    for i in range(len(region.lines)):
-        line = region.lines[i]
-        
-        # Create a shapely Polygon from the line points
-        poly = Polygon(line)
-        
-        # Apply scaling based on text direction
-        if expand_horizontally:
-            # For horizontal text, expand horizontally
-            scaled_poly = affinity.scale(poly, xfact=expand_box_width_ratio, yfact=1, origin='center')
+        return regions  # No change needed
+
+    def boxes_overlap(box1, box2):
+        x1, y1, x2, y2 = box1
+        a1, b1, a2, b2 = box2
+        return not (x2 <= a1 or a2 <= x1 or y2 <= b1 or b2 <= y1)
+
+    expanded_regions = []
+    placed_boxes = []  # Store already placed (x1, y1, x2, y2) boxes
+
+    for region in regions:
+        bbox = region.xyxy  # [x1, y1, x2, y2]
+        if not is_expand_needed(region, img):
+            placed_boxes.append(tuple(bbox.tolist()))
+            expanded_regions.append(region)
+            continue
+
+        x1, y1, x2, y2 = bbox
+        width = x2 - x1
+        height = y2 - y1
+
+        if region.horizontal:
+            new_width = int(width * expand_box_width_ratio)
+            new_height = height
+            center_x = (x1 + x2) // 2
+            new_x1 = center_x - new_width // 2
+            new_x2 = center_x + new_width // 2
+            new_y1, new_y2 = y1, y2
         else:
-            # For vertical text, expand vertically
-            scaled_poly = affinity.scale(poly, xfact=1, yfact=expand_box_width_ratio, origin='center')
-        
-        # Extract the exterior coordinates of the scaled polygon
-        coords = np.array(scaled_poly.exterior.coords)
-        
-        # Remove the last point which is a duplicate of the first in shapely polygons
-        if np.array_equal(coords[0], coords[-1]):
-            coords = coords[:-1]
-        
-        # Update the line with the scaled coordinates
-        region.lines[i] = coords.astype(np.int32)
+            new_height = int(height * expand_box_width_ratio)
+            new_width = width
+            center_y = (y1 + y2) // 2
+            new_y1 = center_y - new_height // 2
+            new_y2 = center_y + new_height // 2
+            new_x1, new_x2 = x1, x2
+
+        # Clip within image boundaries
+        new_x1 = max(0, new_x1)
+        new_y1 = max(0, new_y1)
+        new_x2 = min(img.shape[1], new_x2)
+        new_y2 = min(img.shape[0], new_y2)
+        proposed_box = (new_x1, new_y1, new_x2, new_y2)
+
+        # If overlapping with any already placed box, shift (right for horizontal, down for vertical)
+        shift = 0
+        max_shift = 100
+        while (
+            any(boxes_overlap(proposed_box, placed) for placed in placed_boxes)
+            and shift < max_shift
+        ):
+            shift += 5
+            if region.horizontal:
+                new_x1_shift = min(new_x1 + shift, img.shape[1] - new_width)
+                new_x2_shift = new_x1_shift + new_width
+                proposed_box = (new_x1_shift, new_y1, new_x2_shift, new_y2)
+            else:
+                new_y1_shift = min(new_y1 + shift, img.shape[0] - new_height)
+                new_y2_shift = new_y1_shift + new_height
+                proposed_box = (new_x1, new_y1_shift, new_x2, new_y2_shift)
+
+        placed_boxes.append(proposed_box)
+        # Update region.lines with the new rectangular coordinates
+        new_line = np.array(
+            [
+                [proposed_box[0], proposed_box[1]],
+                [proposed_box[2], proposed_box[1]],
+                [proposed_box[2], proposed_box[3]],
+                [proposed_box[0], proposed_box[3]],
+            ],
+            dtype=np.int32,
+        )
+        region.lines = np.array([new_line])
+        expanded_regions.append(region)
+
+    return expanded_regions
 
 
 async def dispatch(
@@ -161,40 +246,25 @@ async def dispatch(
 ) -> np.ndarray:
 
     text_render.set_font(font_path)
-    text_regions = list(filter(lambda region: region.translation, text_regions))
-    for region in text_regions:
-        expand_text_box(region, config.render.expand_box_width_ratio)
+    text_regions = list(filter(lambda region: region.translation.strip(), text_regions))
+    text_regions = expand_text_boxes(
+        text_regions, config.render.expand_box_width_ratio, img
+    )
 
     log_text = "\n".join([str(i) for i in text_regions])
     # logger.debug(f"text_regions before rearrange: {log_text}")
-    logger.debug(f"font_size_before_rearrange:")
-    for text_region in text_regions:
-        logger.debug(
-            f"font_size {text_region.font_size}, translation {text_region.translation[:3]}, width: {text_region.xywh}"
-        )
+
     try:
         pass
         # text_regions = rearrange_vertical_text_to_horizontal(text_regions, img)
     except Exception as e:
         logger.error(f"Error while rearranging text: {e}", exc_info=True)
     log_text = "\n".join([str(i) for i in text_regions])
-    # logger.debug(f"text_regions after rearrange: {log_text}")
 
-    logger.debug(f"font_size_after_rearrange:")
-    for text_region in text_regions:
-        logger.debug(
-            f"font_size {text_region.font_size}, translation {text_region.translation[:3]}, width: {text_region.xywh}"
-        )
     # Resize regions that are too small
     dst_points_list = resize_regions_to_font_size(
         img, text_regions, font_size_fixed, font_size_offset, font_size_minimum
     )
-    
-    logger.debug(f"font_size_after_resize:")
-    for text_region in text_regions:
-        logger.debug(
-            f"font_size {text_region.font_size}, translation {text_region.translation[:3]}"
-        )
 
     # TODO: Maybe remove intersections
 
@@ -280,7 +350,9 @@ def render(
 
     # Add the missing perspective transform calculation
     M = cv2.getPerspectiveTransform(src_points, dst_points.astype(np.float32))
-    logger.debug(f"for {region.translation[:3]}, souce points {src_points}, dst_points {dst_points}")
+    logger.debug(
+        f"for {region.translation[:3]}, souce points {src_points}, dst_points {dst_points}"
+    )
     rgba_region = cv2.warpPerspective(
         box,
         M,
