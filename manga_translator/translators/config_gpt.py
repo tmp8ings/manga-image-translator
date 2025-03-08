@@ -131,7 +131,7 @@ class ConfigGPT:
         
         return extracted_text.strip() if extracted_text else None
 
-    def save_to_chat_sample(self, language: str, source_text: str, translated_text: str):
+    def save_to_chat_sample(self, language: str, source_text: str | List[str], translated_text: str | List[str]):
         """
         Save recent translation results to _CHAT_SAMPLE for future reference.
         Process involves:
@@ -148,6 +148,14 @@ class ConfigGPT:
         Returns:
             bool: True if the operation was successful, False otherwise
         """
+        # check is array
+        if isinstance(source_text, list):
+            source_text = "\n".join(source_text)
+        if isinstance(translated_text, list):
+            translated_text = "\n".join(translated_text)
+        source_text = source_text.strip()
+        translated_text = translated_text.strip()
+        
         # Get existing samples or initialize if not present
         existing_source = ""
         existing_translation = ""

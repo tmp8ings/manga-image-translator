@@ -125,7 +125,7 @@ class GeminiTranslator(ConfigGPT, CommonTranslator):
             try:
                 response_text = await self._request_translation(to_lang, prompt[0])
                 translations = self._parse_response(response_text, queries)
-                self.save_to_chat_sample(to_lang, "\n".join(queries), translations)
+                self.save_to_chat_sample(to_lang, queries, translations)
                 return translations
             except Exception as e:
                 self.logger.warning(
