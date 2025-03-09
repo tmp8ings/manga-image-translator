@@ -897,10 +897,10 @@ class MangaTranslator:
             right_to_left=True if config.detector.detector != Detector.ctd else False,
         )
         
-        logger.info(f"Text regions before filter: {list(map(lambda x: x.text[:3], text_regions))}")
+        # logger.info(f"Text regions before filter: {list(map(lambda x: x.text[:3], text_regions))}")
         if config.detector.exclude_onomatopoeia:
             text_regions = filter_onomatopoeia(text_regions)
-            logger.info(f"Text regions after filter: {list(map(lambda x: x.text[:3], text_regions))}")
+            # logger.info(f"Text regions after filter: {list(map(lambda x: x.text[:3], text_regions))}")
         return text_regions
 
     async def _run_text_translation(self, config: Config, ctx: Context, reset_samples: bool = False):
