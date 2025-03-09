@@ -389,7 +389,9 @@
             }
             const uploadWithProgress = async (formData) => {
                 try {
-                    const response = await fetch(`${BASE_URI}translate/with-form/image/stream`, {
+                    // change url based on zip or not
+                    const url = this.file.type === 'application/zip' ? `${BASE_URI}translate/with-form/bytes` : `${BASE_URI}translate/with-form/image/stream`;
+                    const response = await fetch(`${url}`, {
                         method: 'POST',
                         body: formData,
                     });
