@@ -185,7 +185,20 @@
                 />
               </div>
             </div>
-
+            <!-- Added new input for Text Threshold -->
+            <div class="flex items-center gap-1" title="Text Threshold">
+              <i class="iconify" data-icon="carbon:threshold"></i>
+              <div class="relative">
+                <input
+                  type="number"
+                  class="w-9ch appearance-none bg-transparent border-b border-gray-300"
+                  v-model="textThreshold"
+                  placeholder="0.5 (Default)"
+                  step="0.01"
+                  value="0.5"
+                />
+              </div>
+            </div>
             <div class="flex items-center gap-1" title="Mask Dilation Offset">
               <i
                 class="iconify"
@@ -442,6 +455,8 @@
         inpaintingSize: "2048",
         customUnclipRatio: 2.3,
         customBoxThreshold: 0.7,
+        // Added new textThreshold data property
+        textThreshold: 0.5,
         maskDilationOffset: 30,
         inpainter: "default",
 
@@ -589,6 +604,7 @@
                     "detector": "${this.textDetector}",
                     "detection_size": ${this.detectionResolution},
                     "box_threshold": ${this.customBoxThreshold},
+                    "text_threshold": ${this.textThreshold},
                     "unclip_ratio": ${this.customUnclipRatio}
                 },
                 "render": {
