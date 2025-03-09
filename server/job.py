@@ -52,12 +52,20 @@ class Job:
                 os.remove(self.file_path)
             except Exception:
                 pass
+    
+    def to_readable_kst_time(self, timestamp: Optional[float] = None) -> str | None:
+        if timestamp is None:
+            return None
+        
+        """Convert timestamp to readable KST time"""
+        return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(timestamp + 32400))
+        # KST is UTC+9, so add 9 hours (32400 seconds) to the timestamp
         
     def to_dict(self):
         """Convert job to dictionary for API responses"""
         return {
             "status": self.status,
             "error": self.error,
-            "created": self.created,
-            "finished": self.finished
+            "created": self.to_readable_kst_time(self.created),
+            "finished": self.to_readable_kst_time(self.finished)
         }
