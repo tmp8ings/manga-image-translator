@@ -113,7 +113,7 @@
                 </div>
             </div>
         </div>
-        <div v-if="result" class="flex flex-col items-center">
+        <div v-if="result && file.type !== 'application/zip'" class="flex flex-col items-center">
             <img class="my-2" :src="resultUri"/>
             <button class="px-2 py-1 text-center rounded-md text-blue-800 border-2 border-blue-300" @click="clear">
                 Upload another
@@ -141,20 +141,22 @@
                 @dragleave.prevent
                 @drop.prevent="ondrop"
         >
-            <div v-if="file" class="flex flex-col items-center gap-2">
-                <div><span class="iconify-inline inline-block mr-2 scale-125" data-icon="carbon:image-search"></span>File
-                    Preview
-                </div>
+            <div v-if="file && file.type !== 'application/zip'" class="flex flex-col items-center gap-2">
+                <div><span class="iconify-inline inline-block mr-2 scale-125" data-icon="carbon:image-search"></span>File Preview</div>
                 <img class="max-w-72 max-h-72" :src="fileUri"/>
-                <button type="submit" class="px-2 py-1 rounded-md text-blue-800 border-2 border-blue-300">Translate
-                </button>
+                <button type="submit" class="px-2 py-1 rounded-md text-blue-800 border-2 border-blue-300">Translate</button>
                 <div class="text-sm text-gray-600">Click the empty space or paste/drag a new one to replace</div>
+            </div>
+            <div v-else-if="file && file.type === 'application/zip'" class="flex flex-col items-center gap-2">
+                <div><span class="iconify-inline inline-block mr-2 scale-125" data-icon="carbon:archive"></span>Zip file selected</div>
+                <button type="submit" class="px-2 py-1 rounded-md text-blue-800 border-2 border-blue-300">Upload Zip</button>
+                <div class="text-sm text-gray-600">Zip file will be processed and downloaded automatically</div>
             </div>
             <div v-else class="flex flex-col items-center gap-2">
                 <i class="iconify w-8 h-8 text-gray-500" data-icon="carbon:cloud-upload"></i>
                 <div>Paste an image, click to select one or drag and drop here</div>
             </div>
-            <input id="file" type="file" accept="image/png,image/jpeg,image/bmp,image/webp" class="hidden"
+            <input id="file" type="file" accept="image/png,image/jpeg,image/bmp,image/webp,application/zip" class="hidden"
                    @change="onfilechange"/>
         </label>
         <div class="flex justify-center gap-2">
@@ -180,7 +182,7 @@
 </form>
 <script>
     const BASE_URI = '/'
-    const acceptTypes = ['image/png', 'image/jpeg', 'image/bmp', 'image/webp']
+    const acceptTypes = ['image/png', 'image/jpeg', 'image/bmp', 'image/webp', 'application/zip']
 
     function formatSize(bytes) {
         const k = 1024
@@ -351,8 +353,20 @@
                     const data = buffer.slice(5, totalSize);
                     switch (statusCode) {
                         case 0:
-                            this.result = new Blob([data], {type: 'image/png'});
-                            this.status = null;
+                            if (this.file.type === 'application/zip') {
+                                const zipBlob = new Blob([data], {type: 'application/zip'});
+                                const downloadUrl = URL.createObjectURL(zipBlob);
+                                const a = document.createElement('a');
+                                a.href = downloadUrl;
+                                a.download = 'download.zip';
+                                document.body.appendChild(a);
+                                a.click();
+                                a.remove();
+                                this.clear();
+                            } else {
+                                this.result = new Blob([data], {type: 'image/png'});
+                                this.status = null;
+                            }
                             break;
                         case 1:
                             this.status = decoder.decode(data);
