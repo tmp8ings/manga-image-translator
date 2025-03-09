@@ -294,8 +294,8 @@ class MangaTranslator:
                 contexts.append(local_ctx)
                 continue
             if self.verbose:
-                img_bbox_raw = np.copy(ctx.img_rgb)
-                for txtln in ctx.textlines:
+                img_bbox_raw = np.copy(local_ctx.img_rgb)
+                for txtln in local_ctx.textlines:
                     cv2.polylines(
                         img_bbox_raw, [txtln.pts], True, color=(255, 0, 0), thickness=2
                     )
@@ -321,7 +321,7 @@ class MangaTranslator:
             local_ctx.text_regions = await self._run_textline_merge(config, local_ctx)
             if self.verbose:
                 bboxes = visualize_textblocks(
-                    cv2.cvtColor(ctx.img_rgb, cv2.COLOR_BGR2RGB), ctx.text_regions
+                    cv2.cvtColor(local_ctx.img_rgb, cv2.COLOR_BGR2RGB), local_ctx.text_regions
                 )
                 cv2.imwrite(self._result_path("bboxes.png"), bboxes)
             contexts.append(local_ctx)
