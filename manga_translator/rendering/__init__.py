@@ -130,29 +130,29 @@ def is_in_speech_balloon(region: TextBlock, img: np.ndarray) -> bool:
 
 def is_expand_needed(region: TextBlock, img: np.ndarray) -> bool:
     # log every elements that can effect the decision
-    logger.debug(f"region {region.translation[:3]}({len(region.translation[:3])}): font size: {region.font_size}, unrotated_size: {region.unrotated_size}")
+    # logger.debug(f"region {region.translation[:3]}({len(region.translation[:3])}): font size: {region.font_size}, unrotated_size: {region.unrotated_size}")
     
     # Do not expand if region is vertical.
     if region.vertical:
-        logger.debug(f"region {region.translation[:3]} is vertical")
+        # logger.debug(f"region {region.translation[:3]} is vertical")
         return False
     # Do not expand for short text (7 or fewer characters).
     if len(region.get_translation_for_rendering()) <= 7:
-        logger.debug(f"region {region.translation[:3]} is short")
+        # logger.debug(f"region {region.translation[:3]} is short")
         return False
     # Do not expand if the line is already wide enough.
     char_per_line = region.unrotated_size[0] // region.font_size
     if char_per_line > 10:
-        logger.debug(f"region {region.translation[:3]} has enough characters per line - {char_per_line}, font_size {region.font_size}, unrotated_size {region.unrotated_size}")
+        # logger.debug(f"region {region.translation[:3]} has enough characters per line - {char_per_line}, font_size {region.font_size}, unrotated_size {region.unrotated_size}")
         return False
     # Do not expand if region is inside a speech balloon.
     if is_in_speech_balloon(region, img):
-        logger.debug(f"region {region.translation[:3]} is in a speech balloon")
+        # logger.debug(f"region {region.translation[:3]} is in a speech balloon")
         return False
     
     # 텍스트 박스의 모양이 세로로 긴 형태일 때 True 리턴
     if region.unrotated_size[1] > region.unrotated_size[0] * 2:
-        logger.debug(f"region {region.translation[:3]} is long")
+        # logger.debug(f"region {region.translation[:3]} is long")
         return True
 
     return False
@@ -261,11 +261,11 @@ async def dispatch(
     text_render.set_font(font_path)
     text_regions = list(filter(lambda region: region.translation.strip(), text_regions))
     
-    logger.debug(f"before expand: {text_regions}")
+    # logger.debug(f"before expand: {text_regions}")
     text_regions = expand_text_boxes(
         text_regions, config.render.expand_box_width_ratio, img
     )
-    logger.debug(f"after expand: {text_regions}")
+    # logger.debug(f"after expand: {text_regions}")
 
     log_text = "\n".join([str(i) for i in text_regions])
     # logger.debug(f"text_regions before rearrange: {log_text}")
