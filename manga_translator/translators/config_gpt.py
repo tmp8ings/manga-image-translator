@@ -113,7 +113,7 @@ class ConfigGPT:
 
     @property
     def chat_sample(self) -> Dict[str, List[str]]:
-        logger.debug(f"Chat sample: {self._CHAT_SAMPLE["Korean"]}")
+        logger.debug(f"Chat sample: {self._CHAT_SAMPLE['Korean']}")
         return self._config_get("chat_sample", self._CHAT_SAMPLE)
 
     @property
