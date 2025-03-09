@@ -8,6 +8,11 @@ import sys
 import logging
 import traceback
 from argparse import Namespace
+import uuid
+from fastapi import BackgroundTasks
+from fastapi.responses import FileResponse, JSONResponse
+from concurrent.futures import ThreadPoolExecutor
+import asyncio  # for running async functions synchronously in the thread
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
@@ -357,6 +362,48 @@ def prepare(args):
     if os.path.exists(folder_name):
         shutil.rmtree(folder_name)
     os.makedirs(folder_name)
+
+
+# Global store for zip jobs
+JOBS = {}
+executor = ThreadPoolExecutor(max_workers=4)
+
+def process_zip_job(job_id: str, req: Request, image_bytes: bytes, config_str: str):
+    try:
+        # Run the async get_ctx synchronously
+        ctx = asyncio.run(get_ctx(req, Config.parse_raw(config_str), image_bytes))
+        temp_filename = os.path.join("upload-cache", f"{job_id}.zip")
+        with open(temp_filename, "wb") as f:
+            f.write(ctx.result)
+        JOBS[job_id]["status"] = "finished"
+        JOBS[job_id]["file"] = temp_filename
+    except Exception as e:
+        JOBS[job_id]["status"] = "error"
+        JOBS[job_id]["error"] = str(e)
+
+@app.post("/translate/with-form/zip-submit", tags=["api", "form"], response_description="Submit zip processing job")
+async def zip_submit(req: Request, image: UploadFile = File(...), config: str = Form("{}")):
+    image_bytes = await image.read()
+    job_id = uuid.uuid4().hex
+    JOBS[job_id] = {"status": "processing"}
+    executor.submit(process_zip_job, job_id, req, image_bytes, config)
+    return JSONResponse({"job_id": job_id, "status": "processing"})
+
+@app.get("/translate/with-form/zip-status/{job_id}", tags=["api", "form"], response_description="Check zip processing job status")
+async def zip_status(job_id: str):
+    job = JOBS.get(job_id)
+    if not job:
+        return JSONResponse({"error": "Job not found"}, status_code=404)
+    return JSONResponse({"job_id": job_id, "status": job["status"], "error": job.get("error", "")})
+
+@app.get("/translate/with-form/zip-download/{job_id}", tags=["api", "form"], response_description="Download processed zip file")
+async def zip_download(job_id: str):
+    job = JOBS.get(job_id)
+    if not job:
+        return JSONResponse({"error": "Job not found"}, status_code=404)
+    if job["status"] != "finished":
+        return JSONResponse({"error": "Job not finished"}, status_code=400)
+    return FileResponse(job["file"], media_type="application/zip", filename="download.zip")
 
 
 # todo: restart if crash

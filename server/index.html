@@ -335,96 +335,133 @@
 
             formData.append('config', config)
 
-            const processChunk = (value) => {
-                if (this.error) return;
-
-                const newBuffer = new Uint8Array(buffer.length + value.length);
-                newBuffer.set(buffer);
-                newBuffer.set(value, buffer.length);
-                buffer = newBuffer;
-
-                while (buffer.length >= 5) {
-                    const dataSize = new DataView(buffer.buffer).getUint32(1, false);
-                    const totalSize = 5 + dataSize;
-                    if (buffer.length < totalSize) {
-                        break;
-                    }
-
-                    const statusCode = buffer[0];
-                    const decoder = new TextDecoder('utf-8');
-                    const data = buffer.slice(5, totalSize);
-                    switch (statusCode) {
-                        case 0:
-                            console.log("status code is 0");
-                            this.result = new Blob([data], {type: 'image/png'});
-                            this.status = null;
-                            break;
-                        case 1:
-                            this.status = decoder.decode(data);
-                            break;
-                        case 2:
-                            this.status = "error";
-                            console.error(decoder.decode(data));
-                            break;
-                        case 3:
-                            this.status = 'pending';
-                            this.queuePos = decoder.decode(data);
-                            break;
-                        case 4:
-                            this.status = 'pending';
-                            this.queuePos = null;
-                            break;
-                    }
-                    buffer = buffer.slice(totalSize);
-                }
-            }
-
-            const uploadWithProgress = async (formData) => {
-                try {
-                    const url = this.isZip(this.file)
-                        ? `${BASE_URI}translate/with-form/zip`
-                        : `${BASE_URI}translate/with-form/image/stream`;
-                    const response = await fetch(url, {
-                        method: 'POST',
-                        body: formData,
-                    });
-                    if (response.status !== 200) {
-                        this.status = 'error-upload';
-                        return;
-                    }
-                    if (this.isZip(this.file)) {
-                        const reader = response.body.getReader();
-                        const chunks = [];
-                        while (true) {
-                            const { done, value } = await reader.read();
-                            if (done) break;
-                            chunks.push(value);
-                            // Yield control to avoid busy waiting
-                            await new Promise(resolve => setTimeout(resolve, 1000));
-                        }
-                        const blob = new Blob(chunks, {type: 'application/zip'});
-                        const downloadUrl = URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.href = downloadUrl;
-                        a.download = 'download.zip';
-                        a.click();
-                        a.remove();
-                        this.clear();
-                    } else {
-                        const reader = response.body.getReader();
-                        while (true) {
-                            const { done, value } = await reader.read();
-                            if (done) break;
-                            processChunk(value);
-                            await new Promise(resolve => setTimeout(resolve, 1000));
-                        }
-                    }
-                } catch (error) {
+            if (this.isZip(this.file)) {
+                // New job-based structure for zip processing.
+                fetch(`${BASE_URI}translate/with-form/zip-submit`, {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(json => {
+                    const job_id = json.job_id;
+                    const pollStatus = () => {
+                        fetch(`${BASE_URI}translate/with-form/zip-status/${job_id}`)
+                        .then(resp => resp.json())
+                        .then(statusJson => {
+                            if (statusJson.status === "finished") {
+                                // Download the zip file once job is finished.
+                                window.location.href = `${BASE_URI}translate/with-form/zip-download/${job_id}`;
+                                this.clear();
+                            } else if(statusJson.status === "error") {
+                                this.status = "error";
+                            } else {
+                                // Continue polling every 2 seconds.
+                                setTimeout(pollStatus, 2000);
+                            }
+                        })
+                        .catch(err => {
+                            console.error(err);
+                            this.status = 'error-disconnect';
+                        });
+                    };
+                    pollStatus();
+                })
+                .catch(error => {
                     console.error(error);
                     this.status = 'error-disconnect';
+                });
+            } else {
+                const processChunk = (value) => {
+                    if (this.error) return;
+
+                    const newBuffer = new Uint8Array(buffer.length + value.length);
+                    newBuffer.set(buffer);
+                    newBuffer.set(value, buffer.length);
+                    buffer = newBuffer;
+
+                    while (buffer.length >= 5) {
+                        const dataSize = new DataView(buffer.buffer).getUint32(1, false);
+                        const totalSize = 5 + dataSize;
+                        if (buffer.length < totalSize) {
+                            break;
+                        }
+
+                        const statusCode = buffer[0];
+                        const decoder = new TextDecoder('utf-8');
+                        const data = buffer.slice(5, totalSize);
+                        switch (statusCode) {
+                            case 0:
+                                console.log("status code is 0");
+                                this.result = new Blob([data], {type: 'image/png'});
+                                this.status = null;
+                                break;
+                            case 1:
+                                this.status = decoder.decode(data);
+                                break;
+                            case 2:
+                                this.status = "error";
+                                console.error(decoder.decode(data));
+                                break;
+                            case 3:
+                                this.status = 'pending';
+                                this.queuePos = decoder.decode(data);
+                                break;
+                            case 4:
+                                this.status = 'pending';
+                                this.queuePos = null;
+                                break;
+                        }
+                        buffer = buffer.slice(totalSize);
+                    }
                 }
+
+                const uploadWithProgress = async (formData) => {
+                    try {
+                        const url = this.isZip(this.file)
+                            ? `${BASE_URI}translate/with-form/zip`
+                            : `${BASE_URI}translate/with-form/image/stream`;
+                        const response = await fetch(url, {
+                            method: 'POST',
+                            body: formData,
+                        });
+                        if (response.status !== 200) {
+                            this.status = 'error-upload';
+                            return;
+                        }
+                        if (this.isZip(this.file)) {
+                            const reader = response.body.getReader();
+                            const chunks = [];
+                            while (true) {
+                                const { done, value } = await reader.read();
+                                if (done) break;
+                                chunks.push(value);
+                                // Yield control to avoid busy waiting
+                                await new Promise(resolve => setTimeout(resolve, 1000));
+                            }
+                            const blob = new Blob(chunks, {type: 'application/zip'});
+                            const downloadUrl = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = downloadUrl;
+                            a.download = 'download.zip';
+                            a.click();
+                            a.remove();
+                            this.clear();
+                        } else {
+                            const reader = response.body.getReader();
+                            while (true) {
+                                const { done, value } = await reader.read();
+                                if (done) break;
+                                processChunk(value);
+                                await new Promise(resolve => setTimeout(resolve, 1000));
+                            }
+                        }
+                    } catch (error) {
+                        console.error(error);
+                        this.status = 'error-disconnect';
+                    }
+                }
+                uploadWithProgress(formData);
             }
-            uploadWithProgress(formData);
         },
         clear() {
             this.file = null
