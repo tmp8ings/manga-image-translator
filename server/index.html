@@ -203,6 +203,38 @@
               Click the empty space or paste/drag a new one to replace
             </div>
           </div>
+          <div
+            v-else-if="file && isZip(file)"
+            class="flex flex-col items-center gap-2"
+          >
+            <div v-if="zipDownloadUrl">
+              <button
+                type="button"
+                class="px-2 py-1 rounded-md text-blue-800 border-2 border-blue-300"
+                @click="downloadZip"
+              >
+                Download Zip
+              </button>
+            </div>
+            <div v-else>
+              <div>
+                <span
+                  class="iconify-inline inline-block mr-2 scale-125"
+                  data-icon="carbon:archive"
+                ></span
+                >Zip file selected
+              </div>
+              <button
+                type="submit"
+                class="px-2 py-1 rounded-md text-blue-800 border-2 border-blue-300"
+              >
+                Upload Zip
+              </button>
+              <div class="text-sm text-gray-600">
+                Zip file will be processed and downloaded automatically
+              </div>
+            </div>
+          </div>
           <div v-else class="flex flex-col items-center gap-2">
             <i
               class="iconify w-8 h-8 text-gray-500"
@@ -344,8 +376,6 @@
         },
         onfilechange(e) {
           const file = e.target.files?.[0];
-          console.log(file);
-          console.log(file.type);
           if (file && acceptTypes.includes(file.type)) {
             this.file = file;
           }
