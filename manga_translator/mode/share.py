@@ -36,20 +36,6 @@ async def load_data(request: Request, method):
 
 class MangaShare:
     def __init__(self, params: dict = None):
-        # Inspect call stack to see where this was called from
-        call_stack = inspect.stack()
-        caller_info = call_stack[1]
-        logger.info(f"MangaShare.__init__ called from: {caller_info.filename}:{caller_info.lineno} in {caller_info.function}")
-        
-        # Log the complete call stack for deeper understanding
-        logger.info("Full call stack:")
-        for i, frame in enumerate(call_stack):
-            logger.info(f"  [{i}] {frame.filename}:{frame.lineno} in {frame.function}")
-            if i < len(call_stack) - 1:
-                # Show the actual line of code that made the call for better context
-                context_line = frame.code_context[0].strip() if frame.code_context else "unknown"
-                logger.info(f"      └─ {context_line}")
-        
         self.manga = MangaTranslator(params)
         self.host = params.get("host", "127.0.0.1")
         self.port = int(params.get("port", "5003"))

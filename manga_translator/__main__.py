@@ -27,23 +27,6 @@ async def dispatch(args: Namespace):
     args_dict = vars(args)
 
     logger.info(f"Running in {args.mode} mode")
-    # show call stack how is it called by
-    # inspect call stack to see where this was called from
-    call_stack = inspect.stack()
-    caller_info = call_stack[1]
-    logger.info(
-        f"MangaTranslator.__init__ called from: {caller_info.filename}:{caller_info.lineno} in {caller_info.function}"
-    )
-    # Log the complete call stack for deeper understanding
-    logger.info("Full call stack:")
-    for i, frame in enumerate(call_stack):
-        logger.info(f"  [{i}] {frame.filename}:{frame.lineno} in {frame.function}")
-        if i < len(call_stack) - 1:
-            # Show the actual line of code that made the call for better context
-            context_line = (
-                frame.code_context[0].strip() if frame.code_context else "unknown"
-            )
-            logger.info(f"      └─ {context_line}")
 
     if args.mode == "local":
         if not args.input:
