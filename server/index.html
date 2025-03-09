@@ -335,6 +335,12 @@
 
             formData.append('config', config)
 
+            // If ZIP file, create a download link from the user-initiated event.
+            if (this.isZip(this.file)) {
+                this.downloadLink = document.createElement('a');
+                this.downloadLink.style.display = 'none';
+                document.body.appendChild(this.downloadLink);
+            }
 
             const processChunk = (value) => {
                 if (this.error) return;
@@ -356,15 +362,17 @@
                     const data = buffer.slice(5, totalSize);
                     switch (statusCode) {
                         case 0:
+                            console.log(`status code is 0 ${this.isZip(this.file)}`)
                             if (this.isZip(this.file)) {
                                 const zipBlob = new Blob([data], {type: this.file.type});
                                 const downloadUrl = URL.createObjectURL(zipBlob);
-                                const a = document.createElement('a');
-                                a.href = downloadUrl;
-                                a.download = 'download.zip';
-                                document.body.appendChild(a);
-                                a.click();
-                                a.remove();
+                                console.log(`downloadUrl: ${downloadUrl}`)
+                                // Trigger download via the pre-created anchor
+                                this.downloadLink.href = downloadUrl;
+                                this.downloadLink.download = 'download.zip';
+                                this.downloadLink.click();
+                                // Cleanup and clear state
+                                this.downloadLink.remove();
                                 this.clear();
                             } else {
                                 this.result = new Blob([data], {type: 'image/png'});
