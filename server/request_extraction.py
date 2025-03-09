@@ -87,3 +87,23 @@ async def while_streaming(req: Request, transform, config: Config, image: bytes 
     )
     asyncio.create_task(wait_in_queue(task, notify_internal))
     return streaming_response
+
+from server.myqueue import polling_in_queue
+
+async def while_polling(req: Request, config: Config, image: bytes | str):
+    # Similar to get_ctx but for polling; QueueElement.__init__ now sets last_poll automatically
+    if isinstance(image, bytes) and zipfile.is_zipfile(io.BytesIO(image)):
+        logger.debug("Input is a zip file")
+        zip_file = image
+        image = Image.new("RGB", (1, 1), color=(255, 255, 255))
+    else:
+        logger.debug("Input is not a zip file, ...")
+        image = await to_pil_image(image)
+        zip_file = None
+    task = QueueElement(req, image, config, 0, zip_file=zip_file)
+    task_queue.add_task(task)
+    current = asyncio.current_task()
+    if current is not None:
+        current.queue_elem = task
+    result = await polling_in_queue(task)
+    return result, task

@@ -25,6 +25,12 @@ class QueueElement:
         else:
             self.image = image
         self.config = config
+        import time
+        self.last_poll = time.time()  # initialize last_poll
+
+    def update_poll(self):
+        import time
+        self.last_poll = time.time()
 
     def get_image(self)-> Image:
         if isinstance(self.image, str):
@@ -103,5 +109,24 @@ async def wait_in_queue(task: QueueElement, notify: NotifyType):
                 return
             else:
                 return result
+        else:
+            await task_queue.wait_for_event()
+
+async def polling_in_queue(task: QueueElement):
+    import time
+    while True:
+        queue_pos = task_queue.get_pos(task)
+        if queue_pos is None:
+            raise HTTPException(500, detail="User is no longer connected")
+        # Check if no polling has occurred in the last 30 seconds
+        if time.time() - getattr(task, "last_poll", 0) > 30:
+            await task_queue.update_event()
+            raise HTTPException(500, detail="User is no longer connected")
+        if queue_pos < executor_instances.free_executors():
+            instance = await executor_instances.find_executor()
+            await task_queue.remove(task)
+            result = await instance.sent(task.image, task.config, zip_file=task.zip_file)
+            await executor_instances.free_executor(instance)
+            return result
         else:
             await task_queue.wait_for_event()

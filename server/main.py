@@ -370,16 +370,12 @@ jobs = {}  # Global dictionary for zip jobs
 
 async def process_zip(job_id: str, req: Request, image_bytes: bytes, config_str: str):
     try:
-        # simulate long processing if needed
-        await asyncio.sleep(2)
         config_obj = Config.parse_raw(config_str)
-        ctx = await get_ctx(req, config_obj, image_bytes)
-        # Mimic /translate/with-form/zip behavior:
-        # Build zip_io from the result
-        zip_io = io.BytesIO(ctx.result)
-        # read the entire content
-        zip_content = zip_io.getvalue()
-        jobs[job_id]["result"] = zip_content
+        # Start while_polling in background so polling can update the task timestamp
+        poll_task = asyncio.create_task(while_polling(req, config_obj, image_bytes))
+        jobs[job_id]["poll_task"] = poll_task  # store the asyncio.Task
+        result, _ = await poll_task   # waiting for result from polling_in_queue
+        jobs[job_id]["result"] = result
         jobs[job_id]["status"] = "finished"
     except Exception as e:
         logger.error(f"Error processing zip job {job_id}: {str(e)}", exc_info=True)
@@ -392,14 +388,12 @@ async def process_zip(job_id: str, req: Request, image_bytes: bytes, config_str:
     response_description="Submit zip processing job",
 )
 async def zip_submit(
-    req: Request,
-    image: UploadFile = File(...),
-    config: str = Form("{}")
+    req: Request, image: UploadFile = File(...), config: str = Form("{}")
 ):
     image_bytes = await image.read()
     job_id = str(uuid.uuid4())
-    jobs[job_id] = {"status": "pending", "result": None, "error": None}
-    # Start processing in background (without awaiting result)
+    jobs[job_id] = {"status": "pending", "result": None, "error": None, "poll_task": None}
+    # Start processing in background
     asyncio.create_task(process_zip(job_id, req, image_bytes, config))
     return JSONResponse(content={"job_id": job_id})
 
@@ -412,6 +406,9 @@ async def zip_status(job_id: str):
     job = jobs.get(job_id)
     if not job:
         raise HTTPException(404, detail="Job not found")
+    if job["status"] == "pending" and job.get("poll_task") is not None and not job["poll_task"].done():
+        if hasattr(job["poll_task"], "queue_elem") and job["poll_task"].queue_elem:
+            job["poll_task"].queue_elem.update_poll()
     return JSONResponse(content={"status": job["status"], "error": job["error"]})
 
 @app.get(
