@@ -435,7 +435,7 @@ async def zip_status(job_id: str):
     tags=["api", "form"],
     response_description="Download processed zip file",
 )
-async def zip_download(job_id: str):
+async def zip_download(job_id: str, filename: str = None):
     job = jobs.get(job_id)
     if not job:
         raise HTTPException(404, detail="Job not found")
@@ -446,16 +446,28 @@ async def zip_download(job_id: str):
     file_path = job.get("file_path")
     if not file_path or not os.path.exists(file_path):
         raise HTTPException(500, detail="File not available")
-        
+    
+    # 파일명 생성 - 클라이언트에서 제공한 이름 사용 또는 기본값 생성
+    if not filename:
+        filename = f"translated-{job_id}.zip"
+    else:
+        # 안전한 파일명인지 확인하고 .zip 확장자를 갖도록 함
+        filename = os.path.basename(filename)
+        if not filename.endswith('.zip'):
+            filename += '.zip'
+    
     # FileResponse를 사용하여 파일 직접 스트리밍
     return FileResponse(
         path=file_path,
+        filename=filename,
         media_type="application/zip",
-        filename=f"translated-{job_id}.zip",
-        # 필요한 경우 custom 헤더 추가
+        # 다운로드를 강제하는 헤더 추가
         headers={
+            "Content-Disposition": f"attachment; filename=\"{filename}\"",
             "Content-Length": str(job.get("file_size", 0)),
-            "Cache-Control": "no-cache"
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0"
         }
     )
 

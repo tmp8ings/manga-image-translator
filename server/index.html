@@ -544,6 +544,7 @@
               job_id: job_id,
               name: translatedName,
               url: `${BASE_URI}translate/with-form/zip-download/${job_id}`,
+              originalName: translatedName // 원본 파일명 보존
             });
             this.status = null;
             this.file = null;
@@ -622,10 +623,9 @@
           this.status = null;
         },
         downloadZip(url, filename) {
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = filename; // Use the provided filename
-          a.click();
+          // URL에 파일명 추가
+          const downloadUrl = `${url}?filename=${encodeURIComponent(filename)}`;
+          window.open(downloadUrl, '_blank');
         },
         async removeDownload(item, index) {
           try {
