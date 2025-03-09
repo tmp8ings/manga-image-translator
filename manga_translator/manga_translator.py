@@ -348,7 +348,7 @@ class MangaTranslator:
         await self._report_progress("translating")
         try:
             # Batch translation based on cumulative text length
-            max_batch = getattr(config.translator, "batch_limit", 500)  # default max characters per batch
+            max_batch = getattr(config.translator, "batch_limit", 1000)  # default max characters per batch
             batched_results = []
             current_batch = []
             current_length = 0
