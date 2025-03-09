@@ -394,8 +394,16 @@
                         return;
                     }
                     if (this.isZip(this.file)) {
-                        // ZIP 파일은 스트림 대신 Blob 전체로 받아 다운로드 처리
-                        const blob = await response.blob();
+                        // Use stream reader instead of waiting for entire blob
+                        const reader = response.body.getReader();
+                        const chunks = [];
+                        while (true) {
+                            const { done, value } = await reader.read();
+                            if (done) break;
+                            chunks.push(value);
+                            // Optionally update UI here to show heartbeat progress
+                        }
+                        const blob = new Blob(chunks, {type: 'application/zip'});
                         const downloadUrl = URL.createObjectURL(blob);
                         const a = document.createElement('a');
                         a.href = downloadUrl;
