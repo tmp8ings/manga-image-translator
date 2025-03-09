@@ -498,17 +498,17 @@
         }
     }).mount()
 </script>
-<!-- Updated download section using v-text to render dynamic values -->
-<div v-if="finishedMessage" class="fixed top-4 left-1/2 transform -translate-x-1/2 bg-green-200 text-green-800 px-4 py-2 rounded shadow-md">
-    <span v-text="finishedMessage"></span>
-</div>
+<!-- New section to list finished zip download buttons with delete option and show finished visual feedback -->
+<div v-if="finishedMessage" class="fixed top-4 left-1/2 transform -translate-x-1/2 bg-green-200 text-green-800 px-4 py-2 rounded shadow-md" v-text="finishedMessage"></div>
 <div v-if="downloads.length > 0" class="fixed bottom-4 right-4 p-4 bg-white rounded shadow-md">
     <h3 class="text-lg font-semibold mb-2">Download Translated Zips</h3>
     <div v-for="(item, index) in downloads" :key="index" class="mb-1 flex gap-2 items-center">
         <button class="px-3 py-1 rounded-md border bg-blue-100 text-blue-800" @click="downloadZip(item.url)">
-            <span v-text="'Download ' + item.name"></span>
+            Download <span v-text="item.name"></span>
         </button>
-        <button class="px-2 py-1 text-red-700" @click="removeDownload(item, index)">Delete</button>
+        <button class="px-2 py-1 text-red-700" @click="removeDownload(item, index)">
+            Delete
+        </button>
     </div>
 </div>
 </body>
