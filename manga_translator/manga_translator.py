@@ -294,8 +294,15 @@ class MangaTranslator:
                 contexts.append(local_ctx)
                 continue
             if self.verbose:
-                # ...existing code to write bboxes...
-                pass
+                img_bbox_raw = np.copy(ctx.img_rgb)
+                for txtln in ctx.textlines:
+                    cv2.polylines(
+                        img_bbox_raw, [txtln.pts], True, color=(255, 0, 0), thickness=2
+                    )
+                cv2.imwrite(
+                    self._result_path("bboxes_unfiltered.png"),
+                    cv2.cvtColor(img_bbox_raw, cv2.COLOR_RGB2BGR),
+                )
             # -- OCR
             await self._report_progress("ocr")
             local_ctx.textlines = await self._run_ocr(config, local_ctx)
@@ -313,8 +320,10 @@ class MangaTranslator:
             await self._report_progress("textline_merge")
             local_ctx.text_regions = await self._run_textline_merge(config, local_ctx)
             if self.verbose:
-                # ...existing code to write merged bboxes...
-                pass
+                bboxes = visualize_textblocks(
+                    cv2.cvtColor(ctx.img_rgb, cv2.COLOR_BGR2RGB), ctx.text_regions
+                )
+                cv2.imwrite(self._result_path("bboxes.png"), bboxes)
             contexts.append(local_ctx)
         
         # Gather all texts from all contexts for batch translation.
@@ -329,25 +338,27 @@ class MangaTranslator:
         if not batch_texts:
             return contexts[-1] if contexts else ctx
         
-        await self._report_progress("translating")
-        translated_sentences = await dispatch_translation(
-            config.translator.translator_gen,
-            batch_texts,
-            config.translator,
-            self.use_mtpe,
-            ctx,
-            "cpu" if self._gpu_limited_memory else self.device,
-        )
+        # New translation block using self._run_text_translation on combined text regions
+        combined_ctx = Context()
+        combined_ctx.text_regions = []
+        for local_ctx in contexts:
+            if local_ctx.text_regions:
+                combined_ctx.text_regions.extend(local_ctx.text_regions)
         
-        # Split the translated sentences back into each context.
-        cur = 0
+        await self._report_progress("translating")
+        try:
+            combined_ctx.text_regions = await self._run_text_translation(config, combined_ctx)
+        except Exception as e:
+            logger.error(f"Error during translation: {str(e)}", exc_info=True)
+            raise e
+        await self._report_progress("after-translating")
+        
+        # Reassign the translated text_regions back to each local context.
+        cursor = 0
         for local_ctx, count in zip(contexts, indices):
             if local_ctx.text_regions:
-                for region in local_ctx.text_regions:
-                    region.translation = translated_sentences[cur]
-                    region.target_lang = config.translator.target_lang
-                    cur += 1
-        await self._report_progress("after-translating")
+                local_ctx.text_regions = combined_ctx.text_regions[cursor:cursor + count]
+                cursor += count
         
         # Post-translation: process each image sequentially.
         for local_ctx in contexts:
