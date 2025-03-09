@@ -382,6 +382,7 @@ async def process_zip(job_id: str, req: Request, image_bytes: bytes, config_str:
         jobs[job_id]["result"] = zip_content
         jobs[job_id]["status"] = "finished"
     except Exception as e:
+        logger.error(f"Error processing zip job {job_id}: {str(e)}", exc_info=True)
         jobs[job_id]["status"] = "error"
         jobs[job_id]["error"] = str(e)
 
@@ -411,7 +412,7 @@ async def zip_status(job_id: str):
     job = jobs.get(job_id)
     if not job:
         raise HTTPException(404, detail="Job not found")
-    return JSONResponse(content={"status": job["status"]})
+    return JSONResponse(content={"status": job["status"], "error": job["error"]})
 
 @app.get(
     "/translate/with-form/zip-download/{job_id}",
