@@ -66,8 +66,15 @@ async def get_ctx(req: Request, config: Config, image: bytes):
 
 
 async def while_streaming(req: Request, transform, config: Config, image: bytes | str):
-    image = await to_pil_image(image)
-    task = QueueElement(req, image, config, 0)
+    if isinstance(image, bytes) and zipfile.is_zipfile(io.BytesIO(image)):
+        logger.debug("Input is a zip file")
+        image = Image.new("RGB", (1, 1), color=(255, 255, 255))
+        zip_file = io.BytesIO(image)
+    else:
+        logger.debug(f"Input is not a zip file, {type(image)}, isinstance: {isinstance(image, bytes)}, zipfile: {zipfile.is_zipfile(io.BytesIO(image))}")
+        image = await to_pil_image(image)
+        zip_file = None
+    task = QueueElement(req, image, config, 0, zip_file=zip_file)
     task_queue.add_task(task)
 
     messages = asyncio.Queue()
