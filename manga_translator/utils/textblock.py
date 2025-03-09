@@ -1,7 +1,7 @@
 import math
 import cv2
 from manga_translator.config import Direction
-from manga_translator.utils.log import get_logger
+from .log import get_logger
 import numpy as np
 from typing import List, Tuple
 from shapely.geometry import Polygon, MultiPoint
