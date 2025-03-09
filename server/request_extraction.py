@@ -52,8 +52,8 @@ async def get_ctx(req: Request, config: Config, image: bytes):
     # Check if the input is a zip archive and extract the first image file if so
     if isinstance(image, bytes) and zipfile.is_zipfile(io.BytesIO(image)):
         logger.debug("Input is a zip file")
+        zip_file = image
         image = Image.new("RGB", (1, 1), color=(255, 255, 255))
-        zip_file = io.BytesIO(image)
     else:
         logger.debug(f"Input is not a zip file, {type(image)}, isinstance: {isinstance(image, bytes)}, zipfile: {zipfile.is_zipfile(io.BytesIO(image))}")
         image = await to_pil_image(image)
@@ -68,7 +68,7 @@ async def get_ctx(req: Request, config: Config, image: bytes):
 async def while_streaming(req: Request, transform, config: Config, image: bytes | str):
     if isinstance(image, bytes) and zipfile.is_zipfile(io.BytesIO(image)):
         logger.debug("Input is a zip file")
-        zip_file = io.BytesIO(image)
+        zip_file = image
         image = Image.new("RGB", (1, 1), color=(255, 255, 255))
     else:
         logger.debug(f"Input is not a zip file, {type(image)}, isinstance: {isinstance(image, bytes)}, zipfile: {zipfile.is_zipfile(io.BytesIO(image))}")
