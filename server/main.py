@@ -375,7 +375,8 @@ async def process_zip(job_id: str, req: Request, image_bytes: bytes, config_str:
         poll_task = asyncio.create_task(while_polling(req, config_obj, image_bytes))
         jobs[job_id]["poll_task"] = poll_task  # store the asyncio.Task
         result, _ = await poll_task   # waiting for result from polling_in_queue
-        jobs[job_id]["result"] = result
+        # Store the bytes from context (result.result) instead of the context itself
+        jobs[job_id]["result"] = result.result
         jobs[job_id]["status"] = "finished"
     except Exception as e:
         logger.error(f"Error processing zip job {job_id}: {str(e)}", exc_info=True)
