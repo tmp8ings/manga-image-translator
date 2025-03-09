@@ -50,7 +50,7 @@ def resize_regions_to_font_size(
     if True or font_size_minimum == -1:
         # Automatically determine font_size by image size
         font_size_minimum = round((img.shape[0] + img.shape[1]) / 200)
-    logger.debug(f"font_size_minimum {font_size_minimum}")
+    # logger.debug(f"font_size_minimum {font_size_minimum}")
 
     dst_points_list = []
     for region in text_regions:
@@ -343,7 +343,7 @@ def render(
             bg,
             line_spacing,
         )
-    logger.debug(f"temp_box shape {temp_box.shape}")
+    # logger.debug(f"temp_box shape {temp_box.shape}")
     h, w, _ = temp_box.shape
     r_temp = w / h
 

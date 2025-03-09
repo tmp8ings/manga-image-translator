@@ -103,9 +103,9 @@ class StableDiffusionInpainter(OfflineInpainter):
         if new_h != h or new_w != w:
             image = cv2.resize(image, (new_w, new_h), interpolation = cv2.INTER_LINEAR)
             mask = cv2.resize(mask, (new_w, new_h), interpolation = cv2.INTER_LINEAR)
-        self.logger.info(f'Inpainting resolution: {new_w}x{new_h}')
+        # self.logger.info(f'Inpainting resolution: {new_w}x{new_h}')
         tags = self.tagger.label_cv2_bgr(cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
-        self.logger.info(f'tags={list(tags.keys())}')
+        # self.logger.info(f'tags={list(tags.keys())}')
         blacklist = set()
         pos_prompt = ','.join([x for x in tags.keys() if x not in blacklist]).replace('_', ' ')
         pos_prompt = 'masterpiece,best quality,' + pos_prompt
