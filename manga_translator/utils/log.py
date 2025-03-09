@@ -1,7 +1,6 @@
 import logging
 import colorama
 
-from .generic import replace_prefix
 
 ROOT_TAG = 'manga-translator'
 
@@ -23,6 +22,7 @@ class Filter(logging.Filter):
         if not record.name.startswith(ROOT_TAG):
             return False
         # Shorten the name
+        from .generic import replace_prefix
         record.name = replace_prefix(record.name, ROOT_TAG + '.', '')
         return super().filter(record)
 
