@@ -699,10 +699,11 @@
             const origName = this.file.name || "download.zip";
             const translatedName =
               origName.replace(/\.zip$/i, "") + "-translated.zip";
+            // Updated: add cache buster to avoid cached/incomplete zip file
             this.downloads.push({
               job_id: job_id,
               name: translatedName,
-              url: `${BASE_URI}translate/with-form/zip-download/${job_id}`,
+              url: `${BASE_URI}translate/with-form/zip-download/${job_id}?t=${Date.now()}`,
               originalName: translatedName,
             });
             this.status = null;
