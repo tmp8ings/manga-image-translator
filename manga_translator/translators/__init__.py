@@ -3,6 +3,8 @@ from typing import Optional
 
 import py3langid as langid
 
+from .config_gpt import ConfigGPT
+
 from .common import *
 from .baidu import BaiduTranslator
 from .deepseek import DeepseekTranslator
@@ -86,8 +88,12 @@ async def prepare(chain: TranslatorChain):
         if isinstance(translator, OfflineTranslator):
             await translator.download()
 
+def reset_translator_samples(translator: OfflineTranslator | CommonTranslator, reset_samples: bool = False):
+    if isinstance(translator, ConfigGPT) and reset_samples:
+        translator.reset_samples()
+
 # TODO: Optionally take in strings instead of TranslatorChain for simplicity
-async def dispatch(chain: TranslatorChain, queries: List[str], translator_config: Optional[TranslatorConfig] = None, use_mtpe: bool = False, args:Optional[Context] = None, device: str = 'cpu') -> List[str]:
+async def dispatch(chain: TranslatorChain, queries: List[str], translator_config: Optional[TranslatorConfig] = None, use_mtpe: bool = False, args:Optional[Context] = None, device: str = 'cpu', *, reset_samples = False) -> List[str]:
     if not queries:
         return queries
 
@@ -104,6 +110,7 @@ async def dispatch(chain: TranslatorChain, queries: List[str], translator_config
             await translator.load('auto', chain.target_lang, device)
         if translator_config:
             translator.parse_args(translator_config)
+        reset_translator_samples(translator, reset_samples)
         queries = await translator.translate('auto', chain.target_lang, queries, use_mtpe)
         return queries
     if args is not None:
@@ -114,6 +121,7 @@ async def dispatch(chain: TranslatorChain, queries: List[str], translator_config
             await translator.load('auto', tgt_lang, device)
         if translator_config:
             translator.parse_args(translator_config)
+        reset_translator_samples(translator, reset_samples)
         queries = await translator.translate('auto', tgt_lang, queries, use_mtpe)
         if args is not None:
             args['translations'][tgt_lang] = queries

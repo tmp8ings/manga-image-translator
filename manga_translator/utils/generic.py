@@ -15,6 +15,8 @@ import json
 from shapely import affinity
 from shapely.geometry import Polygon, MultiPoint
 
+from .textblock import TextBlock
+
 try:
     functools.cached_property
 except AttributeError:  # Supports Python versions below 3.8
@@ -42,7 +44,7 @@ class ContextType(Protocol):
     img_rgb: np.ndarray
     img_alpha: np.ndarray
     mask_raw: np.ndarray
-    text_regions: List[Any]
+    text_regions: List[TextBlock]
     img_inpainted: np.ndarray
     img_rendered: np.ndarray
     result: Image.Image

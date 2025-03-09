@@ -12,7 +12,9 @@ class ConfigGPT:
         'Translate the following text into {to_lang} and keep the original format.\n'
     )
 
-    _CHAT_SAMPLE = {
+    _CHAT_SAMPLE: Dict[str, List[str]] = {}
+    
+    _INITIAL_CHAT_SAMPLE = {
         'Simplified Chinese': [
             (
                 '<|1|>恥ずかしい… 目立ちたくない… 私が消えたい…\n'
@@ -65,6 +67,14 @@ class ConfigGPT:
         # This key is used to locate nested configuration entries
         self._CONFIG_KEY = config_key
         self.config = None
+        self.refresh_chat_sample()
+
+    def refresh_chat_sample(self):
+        """
+        Refresh the chat sample to the initial state.
+        This is useful for resetting the chat sample data.
+        """
+        self._CHAT_SAMPLE = self._INITIAL_CHAT_SAMPLE
 
     def _config_get(self, key: str, default=None):
         if not self.config:

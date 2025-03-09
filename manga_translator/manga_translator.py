@@ -347,7 +347,30 @@ class MangaTranslator:
         
         await self._report_progress("translating")
         try:
-            combined_ctx.text_regions = await self._run_text_translation(config, combined_ctx)
+            # Batch translation based on cumulative text length
+            max_batch = getattr(config.translator, "batch_limit", 500)  # default max characters per batch
+            batched_results = []
+            current_batch = []
+            current_length = 0
+            is_first_batch_translation = True
+            for region in combined_ctx.text_regions:
+                if current_length + len(region.text) > max_batch and current_batch:
+                    ctx_batch = Context()
+                    ctx_batch.text_regions = current_batch
+                    translated = await self._run_text_translation(config, ctx_batch, reset_samples=is_first_batch_translation)
+                    is_first_batch_translation = False
+                    batched_results.extend(translated)
+                    current_batch = []
+                    current_length = 0
+                current_batch.append(region)
+                current_length += len(region.text)
+            if current_batch:
+                ctx_batch = Context()
+                ctx_batch.text_regions = current_batch
+                translated = await self._run_text_translation(config, ctx_batch, reset_samples=is_first_batch_translation)
+                is_first_batch_translation = False
+                batched_results.extend(translated)
+            combined_ctx.text_regions = batched_results
         except Exception as e:
             logger.error(f"Error during translation: {str(e)}", exc_info=True)
             raise e
@@ -880,7 +903,7 @@ class MangaTranslator:
             logger.info(f"Text regions after filter: {list(map(lambda x: x.text[:3], text_regions))}")
         return text_regions
 
-    async def _run_text_translation(self, config: Config, ctx: Context):
+    async def _run_text_translation(self, config: Config, ctx: Context, reset_samples: bool = False):
         current_time = time.time()
         self._model_usage_timestamps[("translation", config.translator.translator)] = (
             current_time
@@ -892,9 +915,6 @@ class MangaTranslator:
             ) as f:
                 translated_sentences = json.load(f)
         else:
-            # logger.info(
-            #     f"original texts: {[region.text for region in ctx.text_regions]}"
-            # )
             translated_sentences = await dispatch_translation(
                 config.translator.translator_gen,
                 [region.text for region in ctx.text_regions],
@@ -902,6 +922,7 @@ class MangaTranslator:
                 self.use_mtpe,
                 ctx,
                 "cpu" if self._gpu_limited_memory else self.device,
+                reset_samples=reset_samples,
             )
             # logger.info(f"translated_sentences: {translated_sentences}")
 
