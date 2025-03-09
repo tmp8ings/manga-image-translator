@@ -113,7 +113,7 @@
                 </div>
             </div>
         </div>
-        <div v-if="result && file.type !== 'application/zip'" class="flex flex-col items-center">
+        <div v-if="result && !isZip(file)" class="flex flex-col items-center">
             <img class="my-2" :src="resultUri"/>
             <button class="px-2 py-1 text-center rounded-md text-blue-800 border-2 border-blue-300" @click="clear">
                 Upload another
@@ -141,13 +141,13 @@
                 @dragleave.prevent
                 @drop.prevent="ondrop"
         >
-            <div v-if="file && file.type !== 'application/zip'" class="flex flex-col items-center gap-2">
+            <div v-if="file && !isZip(file)" class="flex flex-col items-center gap-2">
                 <div><span class="iconify-inline inline-block mr-2 scale-125" data-icon="carbon:image-search"></span>File Preview</div>
                 <img class="max-w-72 max-h-72" :src="fileUri"/>
                 <button type="submit" class="px-2 py-1 rounded-md text-blue-800 border-2 border-blue-300">Translate</button>
                 <div class="text-sm text-gray-600">Click the empty space or paste/drag a new one to replace</div>
             </div>
-            <div v-else-if="file && file.type === 'application/zip'" class="flex flex-col items-center gap-2">
+            <div v-else-if="file && isZip(file)" class="flex flex-col items-center gap-2">
                 <div><span class="iconify-inline inline-block mr-2 scale-125" data-icon="carbon:archive"></span>Zip file selected</div>
                 <button type="submit" class="px-2 py-1 rounded-md text-blue-800 border-2 border-blue-300">Upload Zip</button>
                 <div class="text-sm text-gray-600">Zip file will be processed and downloaded automatically</div>
@@ -219,6 +219,9 @@
             return key ? key[0].toUpperCase() + key.slice(1) : "";
         },
         targetLanguage: 'KOR',
+        isZip(file) {
+            return file && (file.type === 'application/zip' || file.type === 'application/x-zip-compressed')
+        },
         ondrop(e) {
             const file = e.dataTransfer?.files?.[0]
             if (file && acceptTypes.includes(file.type)) {
@@ -353,8 +356,8 @@
                     const data = buffer.slice(5, totalSize);
                     switch (statusCode) {
                         case 0:
-                            if (this.file.type === 'application/zip') {
-                                const zipBlob = new Blob([data], {type: 'application/zip'});
+                            if (this.isZip(this.file)) {
+                                const zipBlob = new Blob([data], {type: this.file.type});
                                 const downloadUrl = URL.createObjectURL(zipBlob);
                                 const a = document.createElement('a');
                                 a.href = downloadUrl;
@@ -390,9 +393,8 @@
             const uploadWithProgress = async (formData) => {
                 try {
                     // change url based on zip or not
-                    console.log(this.file.type);
-                    const url = this.file.type === 'application/zip' ? `${BASE_URI}translate/with-form/bytes` : `${BASE_URI}translate/with-form/image/stream`;
-                    const response = await fetch(`${url}`, {
+                    const url = this.isZip(this.file) ? `${BASE_URI}translate/with-form/bytes` : `${BASE_URI}translate/with-form/image/stream`;
+                    const response = await fetch(url, {
                         method: 'POST',
                         body: formData,
                     });
