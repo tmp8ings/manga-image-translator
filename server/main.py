@@ -35,6 +35,7 @@ from server.request_extraction import (
     TranslateRequest,
 )
 from server.to_json import to_translation, TranslationResponse
+from server.job import Job  # Import the new Job class
 
 # Configure logging
 logging.basicConfig(
@@ -345,44 +346,26 @@ def prepare(args):
     os.makedirs(folder_name)
 
 
-jobs = {}  # Global dictionary for zip jobs
+jobs = {}  # Global dictionary for zip jobs now storing Job objects
 
 
 async def process_zip(job_id: str, req: Request, image_bytes: bytes, config_str: str):
     try:
-        created = jobs[job_id]["created"]
+        job = jobs[job_id]
         config_obj = Config.parse_raw(config_str)
         # Start while_polling in background so polling can update the task timestamp
         poll_task = asyncio.create_task(while_polling(req, config_obj, image_bytes))
-        jobs[job_id]["poll_task"] = poll_task  # store the asyncio.Task
+        job.set_poll_task(poll_task)
         result, _ = await poll_task  # waiting for result from polling_in_queue
         # 결과를 임시 파일에 저장
         temp_file = os.path.join(tempfile.gettempdir(), f"{job_id}.zip")
         with open(temp_file, "wb") as f:
             f.write(result.result)
         # 임시 파일의 경로와 원본 크기 저장
-        jobs[job_id] = {
-            "status": "finished",
-            "result": None,
-            "error": None,
-            "poll_task": None,
-            "file_path": temp_file,
-            "file_size": len(result.result),
-            "created": created,
-            "finished": time.time(),
-        }
+        job.set_finished(temp_file, len(result.result))
     except Exception as e:
         logger.error(f"Error processing zip job {job_id}: {str(e)}", exc_info=True)
-        jobs[job_id] = {
-            "status": "error",
-            "result": None,
-            "error": str(e),
-            "poll_task": None,
-            "file_path": temp_file,
-            "file_size": len(result.result),
-            "created": created,
-            "finished": time.time(),
-        }
+        job.set_error(str(e))
 
 
 @app.post(
@@ -395,20 +378,16 @@ async def zip_submit(
 ):
     image_bytes = await image.read()
     job_id = str(uuid.uuid4())
-    # Store creation time along with other keys
-    jobs[job_id] = {
-        "status": "pending",
-        "result": None,
-        "error": None,
-        "poll_task": None,
-        "created": time.time(),
-        "finished": None,
-    }
-    # Prune jobs: keep only the recent 1 hours
+    # Create a new Job object
+    jobs[job_id] = Job(job_id)
+    
+    # Prune expired jobs
     current_time = time.time()
     for job in list(jobs.keys()):
-        if jobs[job]["created"] < current_time - 3600:
+        if jobs[job].is_expired():
+            jobs[job].cleanup()  # Clean up any resources
             del jobs[job]
+            
     asyncio.create_task(process_zip(job_id, req, image_bytes, config))
     return JSONResponse(content={"job_id": job_id})
 
@@ -422,6 +401,7 @@ async def zip_delete(job_id: str):
     job = jobs.get(job_id)
     if not job:
         raise HTTPException(404, detail="Job not found")
+    job.cleanup()  # Clean up resources before deleting
     del jobs[job_id]
     return JSONResponse(content={"detail": "Job deleted"})
 
@@ -435,14 +415,9 @@ async def zip_status(job_id: str):
     job = jobs.get(job_id)
     if not job:
         raise HTTPException(404, detail="Job not found")
-    if (
-        job["status"] == "pending"
-        and job.get("poll_task") is not None
-        and not job["poll_task"].done()
-    ):
-        if hasattr(job["poll_task"], "queue_elem") and job["poll_task"].queue_elem:
-            job["poll_task"].queue_elem.update_poll()
-    return JSONResponse(content={"status": job["status"], "error": job["error"], "created": job["created"], "finished": job["finished"]})
+    if job.status == "pending":
+        job.update_poll()
+    return JSONResponse(content=job.to_dict())
 
 
 @app.get(
@@ -454,11 +429,11 @@ async def zip_download(job_id: str, filename: str = None):
     job = jobs.get(job_id)
     if not job:
         raise HTTPException(404, detail="Job not found")
-    if job["status"] != "finished":
+    if job.status != "finished":
         raise HTTPException(400, detail="Job not finished")
     
     # 임시 파일 경로 가져오기
-    file_path = job.get("file_path")
+    file_path = job.file_path
     if not file_path or not os.path.exists(file_path):
         raise HTTPException(500, detail="File not available")
     
@@ -479,7 +454,7 @@ async def zip_download(job_id: str, filename: str = None):
         # 다운로드를 강제하는 헤더 추가
         headers={
             "Content-Disposition": f"attachment; filename=\"{filename}\"",
-            "Content-Length": str(job.get("file_size", 0)),
+            "Content-Length": str(job.file_size),
             "Cache-Control": "no-cache, no-store, must-revalidate",
             "Pragma": "no-cache",
             "Expires": "0"
