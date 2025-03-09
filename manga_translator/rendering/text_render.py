@@ -685,7 +685,7 @@ def put_char_horizontal(font_size: int, cdpt: str, pen_l: Tuple[int, int], canva
 def put_text_horizontal(font_size: int, text: str, width: int, height: int, alignment: str,
                         reversed_direction: bool, fg: Tuple[int, int, int], bg: Tuple[int, int, int],
                         lang: str = 'en_US', hyphenate: bool = True, line_spacing: int = 0):
-    logger.debug(f"put_text_horizontal: {font_size}, {text}, {width}, {height}, {alignment}, {reversed_direction}, {line_spacing}")
+    # logger.debug(f"put_text_horizontal: {font_size}, {text}, {width}, {height}, {alignment}, {reversed_direction}, {line_spacing}")
     text = compact_special_symbols(text)
     if not text :
         return
@@ -695,7 +695,7 @@ def put_text_horizontal(font_size: int, text: str, width: int, height: int, alig
     # calc
     # print(width)
     line_text_list, line_width_list = calc_horizontal(font_size, text, width, height, lang, hyphenate)
-    logger.debug(f"put_text_horizontal - line_text_list: {line_text_list}, line_width_list: {line_width_list}")
+    # logger.debug(f"put_text_horizontal - line_text_list: {line_text_list}, line_width_list: {line_width_list}")
     # print(line_text_list, line_width_list)
 
     # make large canvas
@@ -713,7 +713,7 @@ def put_text_horizontal(font_size: int, text: str, width: int, height: int, alig
 
     # write stuff
     for line_text, line_width in zip(line_text_list, line_width_list):
-        logger.debug(f"put_text_horizontal - pen_orig: {pen_orig}, line_text: {line_text[:3]}")
+        # logger.debug(f"put_text_horizontal - pen_orig: {pen_orig}, line_text: {line_text[:3]}")
         pen_line = pen_orig.copy()
         if alignment == 'center':
             pen_line[0] += (max(line_width_list) - line_width) // 2 * (-1 if reversed_direction else 1)
@@ -742,7 +742,7 @@ def put_text_horizontal(font_size: int, text: str, width: int, height: int, alig
     line_box = add_color(canvas_text, fg, canvas_border, bg)
 
     x, y, w, h = cv2.boundingRect(canvas_border)
-    logger.debug(f"put_text_horizontal - line_box: {line_box.shape}, {x}, {y}, {w}, {h}")
+    # logger.debug(f"put_text_horizontal - line_box: {line_box.shape}, {x}, {y}, {w}, {h}")
     return line_box[y:y+h, x:x+w]
 
 # def put_text(img: np.ndarray, text: str, line_count: int, x: int, y: int, w: int, h: int, fg: Tuple[int, int, int], bg: Optional[Tuple[int, int, int]]):
