@@ -24,24 +24,38 @@ def det_batch_forward_default(batch: np.ndarray, device: str):
         mask = mask.cpu().numpy()
     return db, mask
 
+"""
+69080aea78de0803092bc6b751ae283ca463011de5f07e1d20e6491b05571a30  detect.ckpt
+67ce1c4ed4793860f038c71189ba9630a7756f7683b1ee5afb69ca0687dc502e  detect-20241225.ckpt
+b0b095a1e9928ba4d9755d9f78ca295b89ac024f47a67de0e582140ad613e9b8  detect-20240910.ckpt
+"""
+
+name_and_hash = {
+    'detect-20241225.ckpt': '67ce1c4ed4793860f038c71189ba9630a7756f7683b1ee5afb69ca0687dc502e',
+    'detect-20240910.ckpt': 'b0b095a1e9928ba4d9755d9f78ca295b89ac024f47a67de0e582140ad613e9b8',
+    'detect.ckpt': '69080aea78de0803092bc6b751ae283ca463011de5f07e1d20e6491b05571a30',
+}
+
+name = 'detect-20241225.ckpt'
+
 class CotransDetector(OfflineDetector):
     _MODEL_MAPPING = {
         'model': {
-            'url': 'https://github.com/zyddnys/manga-image-translator/releases/download/beta-0.3/detect.ckpt',
-            'hash': '69080aea78de0803092bc6b751ae283ca463011de5f07e1d20e6491b05571a30',
-            'file': '.',
+            'url': f'https://github.com/zyddnys/manga-image-translator/releases/download/beta-0.3/{name}',
+            'hash': name_and_hash[name],
+            'file': name,
         }
     }
 
     def __init__(self, *args, **kwargs):
         os.makedirs(self.model_dir, exist_ok=True)
-        if os.path.exists('detect.ckpt'):
-            shutil.move('detect.ckpt', self._get_file_path('detect.ckpt'))
+        if os.path.exists(name):
+            shutil.move(name, self._get_file_path(name))
         super().__init__(*args, **kwargs)
 
     async def _load(self, device: str):
         self.model = TextDetectionDefault()
-        sd = torch.load(self._get_file_path('detect.ckpt'), map_location='cpu')
+        sd = torch.load(self._get_file_path(name), map_location='cpu')
         self.model.load_state_dict(sd['model'] if 'model' in sd else sd)
         self.model.eval()
         self.device = device
