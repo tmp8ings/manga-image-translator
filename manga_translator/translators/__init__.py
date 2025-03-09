@@ -89,8 +89,10 @@ async def prepare(chain: TranslatorChain):
             await translator.download()
 
 def reset_translator_samples(translator: OfflineTranslator | CommonTranslator, reset_samples: bool = False):
+    logger.debug(f"Resetting samples for {translator.__class__.__name__} is configGpt: {isinstance(translator, ConfigGPT)}, reset_samples: {reset_samples}")
+    
     if isinstance(translator, ConfigGPT) and reset_samples:
-        translator.reset_samples()
+        translator.refresh_chat_sample()
 
 # TODO: Optionally take in strings instead of TranslatorChain for simplicity
 async def dispatch(chain: TranslatorChain, queries: List[str], translator_config: Optional[TranslatorConfig] = None, use_mtpe: bool = False, args:Optional[Context] = None, device: str = 'cpu', *, reset_samples = False) -> List[str]:
