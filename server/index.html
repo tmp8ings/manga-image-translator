@@ -390,18 +390,17 @@
                     });
                     if (response.status !== 200) {
                         this.status = 'error-upload';
-                        this.status = 'pending';
                         return;
                     }
                     if (this.isZip(this.file)) {
-                        // Use stream reader instead of waiting for entire blob
                         const reader = response.body.getReader();
                         const chunks = [];
                         while (true) {
                             const { done, value } = await reader.read();
                             if (done) break;
                             chunks.push(value);
-                            // Optionally update UI here to show heartbeat progress
+                            // Yield control to avoid busy waiting
+                            await new Promise(resolve => setTimeout(resolve, 1000));
                         }
                         const blob = new Blob(chunks, {type: 'application/zip'});
                         const downloadUrl = URL.createObjectURL(blob);
@@ -417,6 +416,7 @@
                             const { done, value } = await reader.read();
                             if (done) break;
                             processChunk(value);
+                            await new Promise(resolve => setTimeout(resolve, 1000));
                         }
                     }
                 } catch (error) {
