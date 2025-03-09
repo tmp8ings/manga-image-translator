@@ -388,7 +388,7 @@
                             name: translatedName,
                             url: `${BASE_URI}translate/with-form/zip-download/${job_id}`
                         });
-                        this.status = "finished";
+                        this.status = null;
                         this.finishedMessage = "Translation completed successfully!";
                         setTimeout(() => { this.finishedMessage = "" }, 5000);
                         break;
