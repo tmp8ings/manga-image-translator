@@ -470,8 +470,8 @@
             }`;
           formData.append("config", config);
 
-          // Removed separate zip branch; now handled in uploadWithProgress
-          uploadWithProgress(formData, buffer);
+          // Call the method via `this`
+          this.uploadWithProgress(formData, buffer);
         },
 
         // New unified upload function that delegates based on file type
