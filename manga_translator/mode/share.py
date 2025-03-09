@@ -163,6 +163,6 @@ class MangaShare:
             asyncio.create_task(self.run_method(method, **attr))
             return streaming_response
 
-        config = uvicorn.Config(app, host=self.host, port=self.port, timeout_keep_alive=3600)
+        config = uvicorn.Config(app, host=self.host, port=self.port, timeout_keep_alive=36000)
         server = uvicorn.Server(config)
         await server.serve()

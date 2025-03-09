@@ -185,6 +185,16 @@ async def json_form(
     return to_translation(ctx)
 
 
+def stream_zip_with_heartbeat(data: io.BytesIO, chunk_size=16*1024, heartbeat=b'\n'):
+    # yield zip data in chunks; heartbeat helps prevent client disconnect
+    while True:
+        chunk = data.read(chunk_size)
+        if not chunk:
+            break
+        yield chunk
+        yield heartbeat
+
+
 @app.post(
     "/translate/with-form/zip",
     response_class=StreamingResponse,
@@ -196,7 +206,9 @@ async def zip_form(
 ) -> StreamingResponse:
     img = await image.read()
     ctx = await get_ctx(req, Config.parse_raw(config), img)
-    return StreamingResponse(io.BytesIO(ctx.result), media_type="application/zip")
+    zip_io = io.BytesIO(ctx.result)
+    # Use our generator to stream zip file with heartbeat chunks
+    return StreamingResponse(stream_zip_with_heartbeat(zip_io), media_type="application/zip")
 
 
 @app.post(
@@ -368,7 +380,7 @@ if __name__ == "__main__":
             host=args.host,
             port=args.port,
             log_level=log_level,
-            timeout_keep_alive=3600  # increased timeout to handle long processing times
+            timeout_keep_alive=36000  # increased timeout to handle long processing times
         )
 
     except Exception as e:
