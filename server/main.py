@@ -350,6 +350,7 @@ jobs = {}  # Global dictionary for zip jobs
 
 async def process_zip(job_id: str, req: Request, image_bytes: bytes, config_str: str):
     try:
+        created = jobs[job_id]["created"]
         config_obj = Config.parse_raw(config_str)
         # Start while_polling in background so polling can update the task timestamp
         poll_task = asyncio.create_task(while_polling(req, config_obj, image_bytes))
@@ -367,11 +368,21 @@ async def process_zip(job_id: str, req: Request, image_bytes: bytes, config_str:
             "poll_task": None,
             "file_path": temp_file,
             "file_size": len(result.result),
+            "created": created,
+            "finished": time.time(),
         }
     except Exception as e:
         logger.error(f"Error processing zip job {job_id}: {str(e)}", exc_info=True)
-        jobs[job_id]["status"] = "error"
-        jobs[job_id]["error"] = str(e)
+        jobs[job_id] = {
+            "status": "error",
+            "result": None,
+            "error": str(e),
+            "poll_task": None,
+            "file_path": temp_file,
+            "file_size": len(result.result),
+            "created": created,
+            "finished": time.time(),
+        }
 
 
 @app.post(
@@ -391,14 +402,13 @@ async def zip_submit(
         "error": None,
         "poll_task": None,
         "created": time.time(),
+        "finished": None,
     }
-    # Prune jobs: keep only the 5 most recent jobs
-    if len(jobs) > 5:
-        sorted_keys = sorted(jobs.keys(), key=lambda k: jobs[k]["created"])
-        # Remove oldest ones until length is 5
-        while len(jobs) > 5:
-            del jobs[sorted_keys.pop(0)]
-    # Start processing in background
+    # Prune jobs: keep only the recent 1 hours
+    current_time = time.time()
+    for job in list(jobs.keys()):
+        if jobs[job]["created"] < current_time - 3600:
+            del jobs[job]
     asyncio.create_task(process_zip(job_id, req, image_bytes, config))
     return JSONResponse(content={"job_id": job_id})
 
@@ -432,7 +442,7 @@ async def zip_status(job_id: str):
     ):
         if hasattr(job["poll_task"], "queue_elem") and job["poll_task"].queue_elem:
             job["poll_task"].queue_elem.update_poll()
-    return JSONResponse(content={"status": job["status"], "error": job["error"]})
+    return JSONResponse(content={"status": job["status"], "error": job["error"], "created": job["created"], "finished": job["finished"]})
 
 
 @app.get(
