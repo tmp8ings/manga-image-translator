@@ -13,6 +13,7 @@ from fastapi import BackgroundTasks
 from fastapi.responses import FileResponse, JSONResponse
 from concurrent.futures import ThreadPoolExecutor
 import asyncio  # for running async functions synchronously in the thread
+import time  # add at the top if not present
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
@@ -393,10 +394,29 @@ async def zip_submit(
 ):
     image_bytes = await image.read()
     job_id = str(uuid.uuid4())
-    jobs[job_id] = {"status": "pending", "result": None, "error": None, "poll_task": None}
+    # Store creation time along with other keys
+    jobs[job_id] = {"status": "pending", "result": None, "error": None, "poll_task": None, "created": time.time()}
+    # Prune jobs: keep only the 5 most recent jobs
+    if len(jobs) > 5:
+        sorted_keys = sorted(jobs.keys(), key=lambda k: jobs[k]["created"])
+        # Remove oldest ones until length is 5
+        while len(jobs) > 5:
+            del jobs[sorted_keys.pop(0)]
     # Start processing in background
     asyncio.create_task(process_zip(job_id, req, image_bytes, config))
     return JSONResponse(content={"job_id": job_id})
+
+@app.delete(
+    "/translate/with-form/zip-delete/{job_id}",
+    tags=["api", "form"],
+    response_description="Delete a zip job",
+)
+async def zip_delete(job_id: str):
+    job = jobs.get(job_id)
+    if not job:
+        raise HTTPException(404, detail="Job not found")
+    del jobs[job_id]
+    return JSONResponse(content={"detail": "Job deleted"})
 
 @app.get(
     "/translate/with-form/zip-status/{job_id}",
