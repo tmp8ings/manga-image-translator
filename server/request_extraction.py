@@ -55,7 +55,7 @@ async def get_ctx(req: Request, config: Config, image: bytes):
         image = Image.new("RGB", (1, 1), color=(255, 255, 255))
         zip_file = io.BytesIO(image)
     else:
-        logger.debug("Input is not a zip file")
+        logger.debug(f"Input is not a zip file, {type(image)}, isinstance: {isinstance(image, bytes)}, zipfile: {zipfile.is_zipfile(io.BytesIO(image))}")
         image = await to_pil_image(image)
         zip_file = None
     task = QueueElement(req, image, config, 0, zip_file=zip_file)
