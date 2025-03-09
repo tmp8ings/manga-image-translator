@@ -451,6 +451,10 @@
         },
         onsubmit(e) {
           if (!this.file) return;
+          if (!this.status) {
+            alert("이미 진행 중인 작업이 있습니다.");
+            return;
+          }
 
           this.progress = null;
           this.queuePos = null;
