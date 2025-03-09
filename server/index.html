@@ -202,6 +202,7 @@
         },
 
         file: null,
+        zipDownloadUrl: null,  // new property for zip download URL
         get fileUri() {
             return this.file ? URL.createObjectURL(this.file) : null
         },
@@ -349,9 +350,9 @@
                         .then(resp => resp.json())
                         .then(statusJson => {
                             if (statusJson.status === "finished") {
-                                // Download the zip file once job is finished.
-                                window.location.href = `${BASE_URI}translate/with-form/zip-download/${job_id}`;
-                                this.clear();
+                                // Instead of auto-downloading, store the download URL.
+                                this.zipDownloadUrl = `${BASE_URI}translate/with-form/zip-download/${job_id}`;
+                                this.status = "finished";
                             } else if(statusJson.status === "error") {
                                 this.status = "error";
                             } else {
@@ -466,7 +467,15 @@
         clear() {
             this.file = null
             this.result = null
+            this.zipDownloadUrl = null  // reset zip download URL
             this.status = null
+        },
+        downloadZip() {
+            // Create a temporary anchor element and trigger download
+            const a = document.createElement('a');
+            a.href = this.zipDownloadUrl;
+            a.download = 'download.zip';
+            a.click();
         },
     }).mount()
 </script>

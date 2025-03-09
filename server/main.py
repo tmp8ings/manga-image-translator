@@ -190,7 +190,7 @@ async def json_form(
     return to_translation(ctx)
 
 
-def stream_zip_with_heartbeat(data: io.BytesIO, chunk_size=16*1024, heartbeat=b'\n'):
+def stream_zip_with_heartbeat(data: io.BytesIO, chunk_size=16 * 1024, heartbeat=b"\n"):
     # yield zip data in chunks; heartbeat helps prevent client disconnect
     while True:
         chunk = data.read(chunk_size)
@@ -213,7 +213,9 @@ async def zip_form(
     ctx = await get_ctx(req, Config.parse_raw(config), img)
     zip_io = io.BytesIO(ctx.result)
     # Use our generator to stream zip file with heartbeat chunks
-    return StreamingResponse(stream_zip_with_heartbeat(zip_io), media_type="application/zip")
+    return StreamingResponse(
+        stream_zip_with_heartbeat(zip_io), media_type="application/zip"
+    )
 
 
 @app.post(
@@ -364,46 +366,70 @@ def prepare(args):
     os.makedirs(folder_name)
 
 
-# Global store for zip jobs
-JOBS = {}
-executor = ThreadPoolExecutor(max_workers=4)
+jobs = {}  # Global dictionary for zip jobs
 
-def process_zip_job(job_id: str, req: Request, image_bytes: bytes, config_str: str):
+async def process_zip(job_id: str, req: Request, image_bytes: bytes, config_str: str):
     try:
-        # Run the async get_ctx synchronously
-        ctx = asyncio.run(get_ctx(req, Config.parse_raw(config_str), image_bytes))
-        temp_filename = os.path.join("upload-cache", f"{job_id}.zip")
-        with open(temp_filename, "wb") as f:
-            f.write(ctx.result)
-        JOBS[job_id]["status"] = "finished"
-        JOBS[job_id]["file"] = temp_filename
+        # simulate long processing if needed
+        await asyncio.sleep(2)
+        config_obj = Config.parse_raw(config_str)
+        ctx = await get_ctx(req, config_obj, image_bytes)
+        # Mimic /translate/with-form/zip behavior:
+        # Build zip_io from the result
+        zip_io = io.BytesIO(ctx.result)
+        # read the entire content
+        zip_content = zip_io.getvalue()
+        jobs[job_id]["result"] = zip_content
+        jobs[job_id]["status"] = "finished"
     except Exception as e:
-        JOBS[job_id]["status"] = "error"
-        JOBS[job_id]["error"] = str(e)
+        jobs[job_id]["status"] = "error"
+        jobs[job_id]["error"] = str(e)
 
-@app.post("/translate/with-form/zip-submit", tags=["api", "form"], response_description="Submit zip processing job")
-async def zip_submit(req: Request, image: UploadFile = File(...), config: str = Form("{}")):
+@app.post(
+    "/translate/with-form/zip-submit",
+    tags=["api", "form"],
+    response_description="Submit zip processing job",
+)
+async def zip_submit(
+    req: Request,
+    image: UploadFile = File(...),
+    config: str = Form("{}")
+):
     image_bytes = await image.read()
-    job_id = uuid.uuid4().hex
-    JOBS[job_id] = {"status": "processing"}
-    executor.submit(process_zip_job, job_id, req, image_bytes, config)
-    return JSONResponse({"job_id": job_id, "status": "processing"})
+    job_id = str(uuid.uuid4())
+    jobs[job_id] = {"status": "pending", "result": None, "error": None}
+    # Start processing in background (without awaiting result)
+    asyncio.create_task(process_zip(job_id, req, image_bytes, config))
+    return JSONResponse(content={"job_id": job_id})
 
-@app.get("/translate/with-form/zip-status/{job_id}", tags=["api", "form"], response_description="Check zip processing job status")
+@app.get(
+    "/translate/with-form/zip-status/{job_id}",
+    tags=["api", "form"],
+    response_description="Check zip processing job status",
+)
 async def zip_status(job_id: str):
-    job = JOBS.get(job_id)
+    job = jobs.get(job_id)
     if not job:
-        return JSONResponse({"error": "Job not found"}, status_code=404)
-    return JSONResponse({"job_id": job_id, "status": job["status"], "error": job.get("error", "")})
+        raise HTTPException(404, detail="Job not found")
+    return JSONResponse(content={"status": job["status"]})
 
-@app.get("/translate/with-form/zip-download/{job_id}", tags=["api", "form"], response_description="Download processed zip file")
+@app.get(
+    "/translate/with-form/zip-download/{job_id}",
+    tags=["api", "form"],
+    response_description="Download processed zip file",
+)
 async def zip_download(job_id: str):
-    job = JOBS.get(job_id)
+    job = jobs.get(job_id)
     if not job:
-        return JSONResponse({"error": "Job not found"}, status_code=404)
+        raise HTTPException(404, detail="Job not found")
     if job["status"] != "finished":
-        return JSONResponse({"error": "Job not finished"}, status_code=400)
-    return FileResponse(job["file"], media_type="application/zip", filename="download.zip")
+        raise HTTPException(400, detail="Job not finished")
+    zip_io = io.BytesIO(job["result"])
+    # Return response similar to /translate/with-form/zip endpoint
+    return StreamingResponse(
+        stream_zip_with_heartbeat(zip_io),
+        media_type="application/zip"
+    )
 
 
 # todo: restart if crash
@@ -427,7 +453,7 @@ if __name__ == "__main__":
             host=args.host,
             port=args.port,
             log_level=log_level,
-            timeout_keep_alive=36000  # increased timeout to handle long processing times
+            timeout_keep_alive=36000,  # increased timeout to handle long processing times
         )
 
     except Exception as e:
