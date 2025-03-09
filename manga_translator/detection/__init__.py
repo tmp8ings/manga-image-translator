@@ -1,5 +1,7 @@
 import numpy as np
 
+from .cotrans import CotransDetector
+
 from .default import DefaultDetector
 from .dbnet_convnext import DBConvNextDetector
 from .ctd import ComicTextDetector
@@ -16,6 +18,7 @@ DETECTORS = {
     Detector.craft: CRAFTDetector,
     Detector.paddle: PaddleDetector,
     Detector.none: NoneDetector,
+    Detector.cotrans: CotransDetector,
 }
 detector_cache = {}
 

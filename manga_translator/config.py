@@ -87,6 +87,7 @@ class Detector(str, Enum):
     craft = "craft"
     paddle = "paddle"
     none = "none"
+    cotrans = "cotrans"
 
 class Inpainter(str, Enum):
     default = "default"

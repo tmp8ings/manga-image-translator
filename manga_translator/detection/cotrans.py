@@ -55,26 +55,19 @@ class CotransDetector(OfflineDetector):
 
     async def _infer(self, image: np.ndarray, detect_size: int, text_threshold: float, box_threshold: float,
                      unclip_ratio: float, verbose: bool = False):
-
-        # TODO: Move det_rearrange_forward to common.py and refactor
-        db, mask = det_rearrange_forward(image, det_batch_forward_default, detect_size, 4, device=self.device, verbose=verbose)
-
-        if db is None:
-            # rearrangement is not required, fallback to default forward
-            img_resized, target_ratio, _, pad_w, pad_h = imgproc.resize_aspect_ratio(cv2.bilateralFilter(image, 17, 80, 80), detect_size, cv2.INTER_LINEAR, mag_ratio = 1)
-            img_resized_h, img_resized_w = img_resized.shape[:2]
-            ratio_h = ratio_w = 1 / target_ratio
-            db, mask = det_batch_forward_default([img_resized], self.device)
-        else:
-            img_resized_h, img_resized_w = image.shape[:2]
-            ratio_w = ratio_h = 1
-            pad_h = pad_w = 0
-        # self.logger.info(f'Detection resolution: {img_resized_w}x{img_resized_h}')
-
-        mask = mask[0, 0, :, :]
+        # Preprocess image (similar to run_detection)
+        img_filtered = cv2.bilateralFilter(image, 17, 80, 80)
+        img_resized = img_filtered.astype(np.float32) / 127.5 - 1.0
+        img_tensor = torch.from_numpy(einops.rearrange(img_resized, 'h w c -> 1 c h w')).to(self.device)
+        # Forward pass
+        with torch.no_grad():
+            db, mask = self.model(img_tensor)
+            db = db.sigmoid().cpu().numpy()
+            mask = mask[0, 0, :, :].cpu().numpy()
+        # Use original image shape for detection
+        h, w = image.shape[:2]
         det = dbnet_utils.SegDetectorRepresenter(text_threshold, box_threshold, unclip_ratio=unclip_ratio)
-        # boxes, scores = det({'shape': [(img_resized.shape[0], img_resized.shape[1])]}, db)
-        boxes, scores = det({'shape':[(img_resized_h, img_resized_w)]}, db)
+        boxes, scores = det({'shape': [(h, w)]}, db)
         boxes, scores = boxes[0], scores[0]
         if boxes.size == 0:
             polys = []
@@ -82,22 +75,11 @@ class CotransDetector(OfflineDetector):
             idx = boxes.reshape(boxes.shape[0], -1).sum(axis=1) > 0
             polys, _ = boxes[idx], scores[idx]
             polys = polys.astype(np.float64)
-            polys = craft_utils.adjustResultCoordinates(polys, ratio_w, ratio_h, ratio_net=1)
+            polys = craft_utils.adjustResultCoordinates(polys, 1, 1, ratio_net=1)
             polys = polys.astype(np.int64)
-
         textlines = [Quadrilateral(pts.astype(int), '', score) for pts, score in zip(polys, scores)]
         textlines = list(filter(lambda q: q.area > 16, textlines))
+        # Resize mask as in reference (doubling dimensions)
         mask_resized = cv2.resize(mask, (mask.shape[1] * 2, mask.shape[0] * 2), interpolation=cv2.INTER_LINEAR)
-        if pad_h > 0:
-            mask_resized = mask_resized[:-pad_h, :]
-        elif pad_w > 0:
-            mask_resized = mask_resized[:, :-pad_w]
         raw_mask = np.clip(mask_resized * 255, 0, 255).astype(np.uint8)
-
-        # if verbose:
-        #     img_bbox_raw = np.copy(image)
-        #     for txtln in textlines:
-        #         cv2.polylines(img_bbox_raw, [txtln.pts], True, color=(255, 0, 0), thickness=2)
-        #     cv2.imwrite(f'result/bboxes_unfiltered.png', cv2.cvtColor(img_bbox_raw, cv2.COLOR_RGB2BGR))
-
         return textlines, raw_mask, None
