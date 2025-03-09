@@ -9,6 +9,7 @@ import logging
 import traceback
 from argparse import Namespace
 import uuid
+import tempfile  # 추가: 임시 파일 처리를 위한 모듈
 from fastapi import BackgroundTasks
 from fastapi.responses import FileResponse, JSONResponse
 from concurrent.futures import ThreadPoolExecutor
@@ -196,34 +197,6 @@ async def json_form(
     return to_translation(ctx)
 
 
-def stream_zip_with_heartbeat(data: io.BytesIO, chunk_size=16 * 1024, heartbeat=b"\n"):
-    # yield zip data in chunks; heartbeat helps prevent client disconnect
-    while True:
-        chunk = data.read(chunk_size)
-        if not chunk:
-            break
-        yield chunk
-        yield heartbeat
-
-
-@app.post(
-    "/translate/with-form/zip",
-    response_class=StreamingResponse,
-    tags=["api", "form"],
-    response_description="stream zip file bytes",
-)
-async def zip_form(
-    req: Request, image: UploadFile = File(...), config: str = Form("{}")
-) -> StreamingResponse:
-    img = await image.read()
-    ctx = await get_ctx(req, Config.parse_raw(config), img)
-    zip_io = io.BytesIO(ctx.result)
-    # Use our generator to stream zip file with heartbeat chunks
-    return StreamingResponse(
-        stream_zip_with_heartbeat(zip_io), media_type="application/zip"
-    )
-
-
 @app.post(
     "/translate/with-form/bytes",
     response_class=StreamingResponse,
@@ -382,8 +355,13 @@ async def process_zip(job_id: str, req: Request, image_bytes: bytes, config_str:
         poll_task = asyncio.create_task(while_polling(req, config_obj, image_bytes))
         jobs[job_id]["poll_task"] = poll_task  # store the asyncio.Task
         result, _ = await poll_task  # waiting for result from polling_in_queue
-        # Store the bytes from context (result.result) instead of the context itself
-        jobs[job_id]["result"] = result.result
+        # 결과를 임시 파일에 저장
+        temp_file = os.path.join(tempfile.gettempdir(), f"{job_id}.zip")
+        with open(temp_file, "wb") as f:
+            f.write(result.result)
+        # 임시 파일의 경로와 원본 크기 저장
+        jobs[job_id]["file_path"] = temp_file
+        jobs[job_id]["file_size"] = len(result.result)
         jobs[job_id]["status"] = "finished"
     except Exception as e:
         logger.error(f"Error processing zip job {job_id}: {str(e)}", exc_info=True)
@@ -463,15 +441,23 @@ async def zip_download(job_id: str):
         raise HTTPException(404, detail="Job not found")
     if job["status"] != "finished":
         raise HTTPException(400, detail="Job not finished")
-    zip_io = io.BytesIO(job["result"])
-
-    # Create response with proper headers for downloading
-    response = StreamingResponse(
-        stream_zip_with_heartbeat(zip_io), media_type="application/zip"
+    
+    # 임시 파일 경로 가져오기
+    file_path = job.get("file_path")
+    if not file_path or not os.path.exists(file_path):
+        raise HTTPException(500, detail="File not available")
+        
+    # FileResponse를 사용하여 파일 직접 스트리밍
+    return FileResponse(
+        path=file_path,
+        media_type="application/zip",
+        filename=f"translated-{job_id}.zip",
+        # 필요한 경우 custom 헤더 추가
+        headers={
+            "Content-Length": str(job.get("file_size", 0)),
+            "Cache-Control": "no-cache"
+        }
     )
-    response.headers["Content-Disposition"] = f"attachment"
-
-    return response
 
 
 # todo: restart if crash
