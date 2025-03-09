@@ -344,6 +344,8 @@
         },
         onfilechange(e) {
           const file = e.target.files?.[0];
+          console.log(file);
+          console.log(file.type);
           if (file && acceptTypes.includes(file.type)) {
             this.file = file;
           }
