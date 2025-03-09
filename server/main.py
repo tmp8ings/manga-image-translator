@@ -380,7 +380,9 @@ async def process_zip(job_id: str, req: Request, image_bytes: bytes, config_str:
 async def zip_submit(
     req: Request, image: UploadFile = File(...), config: str = Form("{}")
 ):
+    logger.info(f"zip_submit start!")
     image_bytes = await image.read()
+    logger.info(f"zip_submit image size: {len(image_bytes)}")
     job_id = str(uuid.uuid4())
     # Create a new Job object
     jobs[job_id] = Job(job_id)
