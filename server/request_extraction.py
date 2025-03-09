@@ -13,7 +13,7 @@ from pydantic import BaseModel
 from fastapi.responses import StreamingResponse
 
 from manga_translator import Config
-from manga_translator.utils.log import get_logger
+from manga_translator.utils import get_logger
 from server.myqueue import task_queue, wait_in_queue, QueueElement
 from server.streaming import notify, stream
 
