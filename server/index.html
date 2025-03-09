@@ -15,10 +15,6 @@
     </style>
 </head>
 <body>
-  <!-- Modified top message container to render only when finishedMessage is non-empty -->
-  <div class="fixed top-0 left-0 w-full p-4 bg-green-200 text-green-800 text-center z-50" v-if="finishedMessage.length > 0">
-      {{ finishedMessage }}
-  </div>
 <form
         action="#"
         class="flex py-8 w-full min-h-100vh justify-center items-center"
@@ -28,6 +24,12 @@
         v-cloak
         un-cloak
 >
+    <!-- Move the top message container inside the form -->
+    <div class="fixed top-0 left-0 w-full p-4 bg-green-200 text-green-800 text-center z-50" 
+         v-if="finishedMessage && finishedMessage.length > 0" 
+         v-cloak>
+        {{ finishedMessage }}
+    </div>
     <div class="flex flex-col w-85ch h-full justify-center gap-2">
         <h1 class="text-center text-lg font-light">Image/Manga Translator</h1>
         <div class="flex mx-4 justify-start items-end">
