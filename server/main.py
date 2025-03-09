@@ -360,9 +360,14 @@ async def process_zip(job_id: str, req: Request, image_bytes: bytes, config_str:
         with open(temp_file, "wb") as f:
             f.write(result.result)
         # 임시 파일의 경로와 원본 크기 저장
-        jobs[job_id]["file_path"] = temp_file
-        jobs[job_id]["file_size"] = len(result.result)
-        jobs[job_id]["status"] = "finished"
+        jobs[job_id] = {
+            "status": "finished",
+            "result": None,
+            "error": None,
+            "poll_task": None,
+            "file_path": temp_file,
+            "file_size": len(result.result),
+        }
     except Exception as e:
         logger.error(f"Error processing zip job {job_id}: {str(e)}", exc_info=True)
         jobs[job_id]["status"] = "error"
