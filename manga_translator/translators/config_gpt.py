@@ -2,7 +2,7 @@ import re
 from typing import List, Dict, Tuple
 from omegaconf import OmegaConf
 
-from manga_translator.utils.log import get_logger
+from ..utils.log import get_logger
 
 logger = get_logger(__name__)
 

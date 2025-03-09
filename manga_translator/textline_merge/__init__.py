@@ -5,7 +5,7 @@ from collections import Counter
 import networkx as nx
 from shapely.geometry import Polygon
 
-from manga_translator.utils.log import get_logger
+from ..utils.log import get_logger
 
 from ..utils import TextBlock, Quadrilateral, quadrilateral_can_merge_region
 

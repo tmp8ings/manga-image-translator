@@ -1,7 +1,7 @@
 import re
 from typing import List
-from manga_translator.utils.log import get_logger
-from manga_translator.utils.textblock import TextBlock
+from .log import get_logger
+from .textblock import TextBlock
 from janome.tokenizer import Tokenizer
 
 
