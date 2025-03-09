@@ -361,6 +361,8 @@ if __name__ == "__main__":
     try:
         # Set Uvicorn log level and extend keep-alive timeout for large zip responses
         log_level = "debug" if args.verbose else "info"
+        proc = prepare(args)
+        print("Nonce: " + nonce)
         uvicorn.run(
             app,
             host=args.host,
@@ -368,8 +370,6 @@ if __name__ == "__main__":
             log_level=log_level,
             timeout_keep_alive=3600  # increased timeout to handle long processing times
         )
-        proc = prepare(args)
-        print("Nonce: " + nonce)
 
     except Exception as e:
         logger.critical(f"Server crashed: {str(e)}")
