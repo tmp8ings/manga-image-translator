@@ -270,7 +270,7 @@ class ModelMangaOCR(OfflineOCR):
             bb = round(np.mean(bg_b))
             
             txt = texts[i]
-            self.logger.info(f'prob: {prob} {txt} fg: ({fr}, {fg}, {fb}) bg: ({br}, {bg}, {bb})')
+            # self.logger.debug(f'prob: {prob} {txt} fg: ({fr}, {fg}, {fb}) bg: ({br}, {bg}, {bb})')
             cur_region = merged_quadrilaterals[i][0]
             if isinstance(cur_region, Quadrilateral):
                 cur_region.text = txt

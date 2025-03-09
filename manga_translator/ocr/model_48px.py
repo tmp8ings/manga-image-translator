@@ -141,7 +141,7 @@ class Model48pxOCR(OfflineOCR):
                 br = min(max(int(br()), 0), 255)
                 bg = min(max(int(bg()), 0), 255)
                 bb = min(max(int(bb()), 0), 255)
-                self.logger.info(f'prob: {prob} {txt} fg: ({fr}, {fg}, {fb}) bg: ({br}, {bg}, {bb})')
+                # self.logger.debug(f'prob: {prob} {txt} fg: ({fr}, {fg}, {fb}) bg: ({br}, {bg}, {bb})')
                 cur_region = quadrilaterals[indices[i]][0]
                 if isinstance(cur_region, Quadrilateral):
                     cur_region.text = txt
