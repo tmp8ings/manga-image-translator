@@ -272,24 +272,24 @@ class MangaTranslator:
             local_ctx.input = img
             # -- Colorization
             if config.colorizer.colorizer != Colorizer.none:
-                await self._report_progress("colorizing")
+                # await self._report_progress("colorizing")
                 local_ctx.img_colorized = await self._run_colorizer(config, local_ctx)
             else:
                 local_ctx.img_colorized = img
             # -- Upscaling
             if config.upscale.upscale_ratio:
-                await self._report_progress("upscaling")
+                # await self._report_progress("upscaling")
                 local_ctx.upscaled = await self._run_upscaling(config, local_ctx)
             else:
                 local_ctx.upscaled = local_ctx.img_colorized
             local_ctx.img_rgb, local_ctx.img_alpha = load_image(local_ctx.upscaled)
             # -- Detection
-            await self._report_progress("detection")
+            # await self._report_progress("detection")
             local_ctx.textlines, local_ctx.mask_raw, local_ctx.mask = await self._run_detection(config, local_ctx)
             if self.verbose:
                 cv2.imwrite(self._result_path("mask_raw.png"), local_ctx.mask_raw)
             if not local_ctx.textlines:
-                await self._report_progress("skip-no-regions", True)
+                # await self._report_progress("skip-no-regions", True)
                 local_ctx.result = local_ctx.upscaled
                 contexts.append(local_ctx)
                 continue
@@ -304,10 +304,10 @@ class MangaTranslator:
                     cv2.cvtColor(img_bbox_raw, cv2.COLOR_RGB2BGR),
                 )
             # -- OCR
-            await self._report_progress("ocr")
+            # await self._report_progress("ocr")
             local_ctx.textlines = await self._run_ocr(config, local_ctx)
             if not local_ctx.textlines:
-                await self._report_progress("skip-no-text", True)
+                # await self._report_progress("skip-no-text", True)
                 local_ctx.result = local_ctx.upscaled
                 contexts.append(local_ctx)
                 continue
@@ -317,7 +317,7 @@ class MangaTranslator:
                 original = textline.text
                 textline.text = apply_dictionary(textline.text, pre_dict)
             # -- Textline merge
-            await self._report_progress("textline_merge")
+            # await self._report_progress("textline_merge")
             local_ctx.text_regions = await self._run_textline_merge(config, local_ctx)
             if self.verbose:
                 bboxes = visualize_textblocks(
@@ -386,12 +386,12 @@ class MangaTranslator:
         # Post-translation: process each image sequentially.
         for local_ctx in contexts:
             if not local_ctx.text_regions or local_ctx.text_regions == "cancel":
-                await self._report_progress("cancelled", True)
+                # await self._report_progress("cancelled", True)
                 local_ctx.result = local_ctx.upscaled
                 continue
             # -- Mask refinement
             if local_ctx.mask is None:
-                await self._report_progress("mask-generation")
+                # await self._report_progress("mask-generation")
                 local_ctx.mask = await self._run_mask_refinement(config, local_ctx)
             if self.verbose:
                 inpaint_input_img = await dispatch_inpainting(
@@ -406,7 +406,7 @@ class MangaTranslator:
                 cv2.imwrite(self._result_path("inpaint_input.png"), cv2.cvtColor(inpaint_input_img, cv2.COLOR_RGB2BGR))
                 cv2.imwrite(self._result_path("mask_final.png"), local_ctx.mask)
             # -- Inpainting
-            await self._report_progress("inpainting")
+            # await self._report_progress("inpainting")
             local_ctx.img_inpainted = await self._run_inpainting(config, local_ctx)
             local_ctx.gimp_mask = np.dstack(
                 (cv2.cvtColor(local_ctx.img_inpainted, cv2.COLOR_RGB2BGR), local_ctx.mask)
@@ -414,16 +414,17 @@ class MangaTranslator:
             if self.verbose:
                 cv2.imwrite(self._result_path("inpainted.png"), cv2.cvtColor(local_ctx.img_inpainted, cv2.COLOR_RGB2BGR))
             # -- Rendering
-            await self._report_progress("rendering")
+            # await self._report_progress("rendering")
             try:
                 local_ctx.img_rendered = await self._run_text_rendering(config, local_ctx)
             except Exception as e:
                 logger.error(f"Error during rendering: {str(e)}", exc_info=True)
                 raise e
-            await self._report_progress("finished", True)
+            # await self._report_progress("finished", True)
             local_ctx.result = dump_image(local_ctx.input, local_ctx.img_rendered, local_ctx.img_alpha)
             local_ctx = await self._revert_upscale(config, local_ctx)
         
+        await self._report_progress("finished", True)
         # Optionally, attach all batch results to the original context.
         images = [local_ctx.result for local_ctx in contexts]
         ctx.result = await self._zip_images(images)
