@@ -9,6 +9,8 @@ import logging
 import traceback
 from argparse import Namespace
 
+from manga_translator.utils.generic import Context
+
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from fastapi import FastAPI, Request, HTTPException, Header, UploadFile, File, Form
@@ -128,6 +130,12 @@ async def json_form(req: Request, image: UploadFile = File(...), config: str = F
     img = await image.read()
     ctx = await get_ctx(req, Config.parse_raw(config), img)
     return to_translation(ctx)
+
+@app.post("/translate/with-form/zip", response_class=StreamingResponse, tags=["api", "form"],response_description="custom byte structure for decoding look at examples in 'examples/response.*'")
+async def bytes_form(req: Request, image: UploadFile = File(...), config: str = Form("{}")):
+    img = await image.read()
+    ctx = await get_ctx(req, Config.parse_raw(config), img)
+    return StreamingResponse(content=ctx.result)
 
 @app.post("/translate/with-form/bytes", response_class=StreamingResponse, tags=["api", "form"],response_description="custom byte structure for decoding look at examples in 'examples/response.*'")
 async def bytes_form(req: Request, image: UploadFile = File(...), config: str = Form("{}")):
