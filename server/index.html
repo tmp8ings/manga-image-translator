@@ -185,6 +185,19 @@
             >Source Code</a
             >
         </div>
+    </div> <!-- End of main form container -->
+    <!-- Add UI for finishedMessage and downloads -->
+    <div class="fixed bottom-0 right-0 m-4 p-4 bg-white shadow rounded" v-if="finishedMessage || downloads.length">
+      <div v-if="finishedMessage" class="mb-2 text-green-600">{{ finishedMessage }}</div>
+      <div v-if="downloads.length">
+        <h2 class="font-bold mb-1">Downloads</h2>
+        <ul>
+          <li v-for="(download, idx) in downloads" :key="download.job_id" class="flex items-center gap-2">
+            <a :href="download.url" target="_blank">{{ download.name }}</a>
+            <button @click="removeDownload(download, idx)" class="text-sm text-red-600">Remove</button>
+          </li>
+        </ul>
+      </div>
     </div>
 </form>
 <script>
@@ -358,11 +371,11 @@
                         .then(resp => resp.json())
                         .then(statusJson => {
                             console.log("Polling job:", job_id, "status:", statusJson.status);
-                            // trim the status to remove extra spaces
                             const currStatus = statusJson.status.trim();
                             if (currStatus === "finished") {
                                 const origName = this.file.name || "download.zip";
                                 const translatedName = origName.replace(/\.zip$/i, "") + "-translated.zip";
+                                // Update download item list and show the finished message
                                 this.downloads.push({ job_id: job_id, name: translatedName, url: `${BASE_URI}translate/with-form/zip-download/${job_id}` });
                                 this.status = "finished";
                                 this.finishedMessage = "Translation completed successfully!";
@@ -498,18 +511,5 @@
         }
     }).mount()
 </script>
-<!-- New section to list finished zip download buttons with delete option and show finished visual feedback -->
-<div v-if="finishedMessage" class="fixed top-4 left-1/2 transform -translate-x-1/2 bg-green-200 text-green-800 px-4 py-2 rounded shadow-md" v-text="finishedMessage"></div>
-<div v-if="downloads.length > 0" class="fixed bottom-4 right-4 p-4 bg-white rounded shadow-md">
-    <h3 class="text-lg font-semibold mb-2">Download Translated Zips</h3>
-    <div v-for="(item, index) in downloads" :key="index" class="mb-1 flex gap-2 items-center">
-        <button class="px-3 py-1 rounded-md border bg-blue-100 text-blue-800" @click="downloadZip(item.url)">
-            Download <span v-text="item.name"></span>
-        </button>
-        <button class="px-2 py-1 text-red-700" @click="removeDownload(item, index)">
-            Delete
-        </button>
-    </div>
-</div>
 </body>
 </html>
