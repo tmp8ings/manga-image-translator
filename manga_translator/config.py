@@ -270,11 +270,11 @@ class DetectorConfig(BaseModel):
     """Threshold for text detection"""
     det_rotate: bool = False
     """Rotate the image for detection. Might improve detection."""
-    det_auto_rotate: bool = False
+    det_auto_rotate: bool = True
     """Rotate the image for detection to prefer vertical textlines. Might improve detection."""
-    det_invert: bool = False
+    det_invert: bool = True
     """Invert the image colors for detection. Might improve detection."""
-    det_gamma_correct: bool = False
+    det_gamma_correct: bool = True
     """Applies gamma correction for detection. Might improve detection."""
     box_threshold: float = 0.7
     """Threshold for bbox generation"""
