@@ -310,6 +310,11 @@
         "application/x-zip-compressed",
       ];
 
+      // Add sleep utility function
+      async function sleep(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+      }
+
       function formatSize(bytes) {
         const k = 1024;
         const sizes = ["B", "KB", "MB", "GB", "TB"];
@@ -488,6 +493,32 @@
           }
         },
 
+        // New helper function for job status polling with a loop instead of recursion
+        async pollJobStatus(job_id) {
+          try {
+            while (true) {
+              const resp = await fetch(
+                `${BASE_URI}translate/with-form/zip-status/${job_id}`
+              );
+              const statusJson = await resp.json();
+              console.log("Polling job:", job_id, "status:", statusJson.status);
+              const currStatus = statusJson.status.trim();
+              
+              if (currStatus === "finished") {
+                return "finished";
+              } else if (currStatus === "error") {
+                return "error";
+              } else {
+                // Wait before next polling attempt
+                await sleep(2000);
+              }
+            }
+          } catch (err) {
+            console.error(err);
+            return "error-disconnect";
+          }
+        },
+
         // New helper for handling zip file submission
         async handleZipSubmit(formData) {
           const response = await fetch(
@@ -503,41 +534,25 @@
           }
           const json = await response.json();
           const job_id = json.job_id;
-          // Replace pollStatus using async-await
-          const pollStatus = async () => {
-            try {
-              const resp = await fetch(
-                `${BASE_URI}translate/with-form/zip-status/${job_id}`
-              );
-              const statusJson = await resp.json();
-              console.log("Polling job:", job_id, "status:", statusJson.status);
-              const currStatus = statusJson.status.trim();
-              if (currStatus === "finished") {
-                const origName = this.file.name || "download.zip";
-                const translatedName =
-                  origName.replace(/\.zip$/i, "") + "-translated.zip";
-                this.downloads.push({
-                  job_id: job_id,
-                  name: translatedName,
-                  url: `${BASE_URI}translate/with-form/zip-download/${job_id}`,
-                });
-                this.status = null;
-                this.file = null;
-                this.finishedMessage = "Translation completed successfully!";
-                setTimeout(() => {
-                  this.finishedMessage = "";
-                }, 5000);
-              } else if (currStatus === "error") {
-                this.status = "error";
-              } else {
-                setTimeout(pollStatus, 2000);
-              }
-            } catch (err) {
-              console.error(err);
-              this.status = "error-disconnect";
-            }
-          };
-          await pollStatus();
+          
+          // Use the helper function with loop-based polling
+          const status = await this.pollJobStatus(job_id);
+          if (status === "finished") {
+            const origName = this.file.name || "download.zip";
+            const translatedName = origName.replace(/\.zip$/i, "") + "-translated.zip";
+            this.downloads.push({
+              job_id: job_id,
+              name: translatedName,
+              url: `${BASE_URI}translate/with-form/zip-download/${job_id}`,
+            });
+            this.status = null;
+            this.file = null;
+            this.finishedMessage = "Translation completed successfully!";
+            await sleep(5000);
+            this.finishedMessage = "";
+          } else {
+            this.status = status; // Will be 'error' or 'error-disconnect'
+          }
         },
 
         // New helper for handling non-zip file upload with streaming
@@ -597,7 +612,7 @@
             const { done, value } = await reader.read();
             if (done) break;
             processChunk(value);
-            await new Promise((resolve) => setTimeout(resolve, 1000));
+            await sleep(1000);
           }
         },
         clear() {
