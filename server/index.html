@@ -243,6 +243,18 @@
           </div>
         </div>
 
+        <!-- New row: det_invert and det_gamma_correct checkboxes -->
+        <div class="flex mx-4 justify-start items-center gap-4">
+          <div class="flex items-center gap-1" title="Invert image colors for detection">
+            <input type="checkbox" v-model="detInvert" />
+            <label class="text-sm">Invert</label>
+          </div>
+          <div class="flex items-center gap-1" title="Apply gamma correction for detection">
+            <input type="checkbox" v-model="detGammaCorrect" />
+            <label class="text-sm">Gamma Correct</label>
+          </div>
+        </div>
+
         <div v-if="result && !isZip(file)" class="flex flex-col items-center">
           <img class="my-2" :src="resultUri" />
           <button
@@ -474,6 +486,10 @@
           );
         },
 
+        // New detection options
+        detInvert: true,
+        detGammaCorrect: true,
+
         ondrop(e) {
           const file = e.dataTransfer?.files?.[0];
           if (
@@ -610,7 +626,9 @@
                     "detection_size": ${this.detectionResolution},
                     "box_threshold": ${this.customBoxThreshold},
                     "text_threshold": ${this.textThreshold},
-                    "unclip_ratio": ${this.customUnclipRatio}
+                    "unclip_ratio": ${this.customUnclipRatio},
+                    "det_invert": ${this.detInvert},
+                    "det_gamma_correct": ${this.detGammaCorrect}
                 },
                 "render": {
                     "direction": "${this.renderTextDirection}"
