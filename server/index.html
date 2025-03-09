@@ -253,6 +253,25 @@
             <input type="checkbox" v-model="detGammaCorrect" />
             <label class="text-sm">Gamma Correct</label>
           </div>
+          <!-- Add OCR model selection dropdown -->
+          <div class="flex items-center gap-1" title="OCR Model">
+            <i class="iconify" data-icon="carbon:text-recognition"></i>
+            <div class="relative">
+              <select
+                class="w-12ch appearance-none bg-transparent border-b border-gray-300"
+                v-model="ocrModel"
+              >
+                <option value="32px">32px</option>
+                <option value="48px">48px</option>
+                <option value="48px_ctc">48px_ctc</option>
+                <option value="mocr">MOCR</option>
+              </select>
+              <i
+                class="iconify absolute top-1.5 right-1 pointer-events-none"
+                data-icon="carbon:chevron-down"
+              ></i>
+            </div>
+          </div>
         </div>
 
         <div v-if="result && !isZip(file)" class="flex flex-col items-center">
@@ -488,6 +507,8 @@
         // New detection options
         detInvert: true,
         detGammaCorrect: true,
+        // Add OCR model option
+        ocrModel: "mocr",
 
         ondrop(e) {
           const file = e.dataTransfer?.files?.[0];
@@ -639,6 +660,9 @@
                 "inpainter": {
                     "inpainter": "${this.inpainter}",
                     "inpainting_size": ${this.inpaintingSize}
+                },
+                "ocr": {
+                    "ocr": "${this.ocrModel}"
                 },
                 "mask_dilation_offset": ${this.maskDilationOffset}
             }`;
