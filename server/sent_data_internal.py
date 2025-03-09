@@ -31,9 +31,14 @@ async def fetch_data_stream(
 
 
 async def fetch_data(
-    url, image: Image, config: Config, headers: Mapping[str, str] = {}
+    url,
+    image: Image,
+    config: Config,
+    headers: Mapping[str, str] = {},
+    *,
+    zip_file: bytes = None
 ):
-    attributes = {"image": image, "config": config}
+    attributes = {"image": image, "config": config, "zip_file": zip_file}
     data = pickle.dumps(attributes)
 
     async with aiohttp.ClientSession() as session:
