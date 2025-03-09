@@ -133,7 +133,10 @@ async def json_form(req: Request, image: UploadFile = File(...), config: str = F
 async def zip_form(req: Request, image: UploadFile = File(...), config: str = Form("{}")) -> StreamingResponse:
     img = await image.read()
     ctx = await get_ctx(req, Config.parse_raw(config), img)
-    return StreamingResponse(io.BytesIO(ctx.result), media_type="application/zip")
+    data = ctx.result  # zip bytes
+    # Wrap data with a framing: 1 byte status (0) + 4 byte length + data
+    framed = bytes([0]) + len(data).to_bytes(4, 'big') + data
+    return StreamingResponse(io.BytesIO(framed), media_type="application/zip")
 
 @app.post("/translate/with-form/bytes", response_class=StreamingResponse, tags=["api", "form"],response_description="custom byte structure for decoding look at examples in 'examples/response.*'")
 async def bytes_form(req: Request, image: UploadFile = File(...), config: str = Form("{}")):
