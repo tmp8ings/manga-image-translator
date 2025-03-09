@@ -9,8 +9,6 @@ import logging
 import traceback
 from argparse import Namespace
 
-from manga_translator.utils.generic import Context
-
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from fastapi import FastAPI, Request, HTTPException, Header, UploadFile, File, Form
