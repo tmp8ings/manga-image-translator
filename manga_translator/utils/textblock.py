@@ -1,7 +1,6 @@
 import math
 import cv2
 from manga_translator.config import Direction
-from .log import get_logger
 import numpy as np
 from typing import List, Tuple
 from shapely.geometry import Polygon, MultiPoint
@@ -10,11 +9,8 @@ import copy
 import re
 import py3langid as langid
 
-from .generic import color_difference, is_right_to_left_char, is_valuable_char
-
 # from ..detection.ctd_utils.utils.imgproc_utils import union_area, xywh2xyxypoly
 
-logger = get_logger("textblock")
 
 # LANG_LIST = ['eng', 'ja', 'unknown']
 # LANGCLS2IDX = {'eng': 0, 'ja': 1, 'unknown': 2}
@@ -333,6 +329,7 @@ class TextBlock(object):
         return self._source_lang
 
     def get_translation_for_rendering(self):
+        from .generic import is_right_to_left_char, is_valuable_char  # added local import
         text = self.translation
         if self.direction.endswith("r"):
             # The render direction is right to left so left-to-right
@@ -395,7 +392,7 @@ class TextBlock(object):
             self.bg_colors += bg_colors / nlines
 
     def get_font_colors(self, bgr=False):
-
+        from .generic import color_difference  # added local import
         frgb = np.array(self.fg_colors).astype(np.int32)
         brgb = np.array(self.bg_colors).astype(np.int32)
 
@@ -459,10 +456,16 @@ class TextBlock(object):
             return self.default_stroke_width
         return 0
 
+    @property
+    def logger(self):
+        from .log import get_logger
+
+        return get_logger(self.__class__.__name__)
+
     def is_vertical_caption(self, img: np.ndarray) -> bool:
         """세로 쓰기 캡션 여부 (aspect ratio, 너비, 배경, 위치 기반으로 판단)"""
         if not (self.aspect_ratio < 0.7):  # 기존 조건 유지
-            logger.debug(
+            self.logger.debug(
                 f"Aspect ratio or width not satisfied for {self.translation[:3]}: {self.aspect_ratio}, {self.xywh[2]}"
             )
             return False
@@ -471,12 +474,12 @@ class TextBlock(object):
             x1, y1, x2, y2 = self.xyxy
             region = img[y1:y2, x1:x2]
             if region.size == 0:  # 이미지 영역 벗어난 경우 방지
-                logger.debug(f"Region size is 0 for {self.translation[:3]}")
+                self.logger.debug(f"Region size is 0 for {self.translation[:3]}")
                 return False
             gray_region = cv2.cvtColor(region, cv2.COLOR_BGR2GRAY)
             bg_variance = np.var(gray_region)
             if bg_variance < 30:  # 배경 variance 임계값 (조정 가능)
-                logger.debug(
+                self.logger.debug(
                     f"Background variance not satisfied for {self.translation[:3]}: {bg_variance}"
                 )
                 return False  # 배경 variance가 낮으면 말풍선으로 간주
@@ -484,12 +487,12 @@ class TextBlock(object):
         # 위치 기반 조건 (상단에서 시작, 세로로 긴 형태)
         image_height = img.shape[0] if img is not None else 500
         if self.xyxy[1] >= image_height * 0.3:
-            logger.debug(
+            self.logger.debug(
                 f"Location condition not satisfied for {self.translation[:3]}: {self.xyxy[1]} and image height is {image_height}"
             )
             return False  # 위치 조건 불만족 시 캡션 아님
 
-        logger.debug(
+        self.logger.debug(
             f"This is a vertical caption for{self.translation[:3]}: {self.xyxy[1]}, {self.aspect_ratio}"
         )
         return True  # 그 외는 세로 쓰기 캡션임
@@ -504,7 +507,9 @@ class TextBlock(object):
         """재배치 여부 설정 속성"""
         self._is_rearranged = value
 
-    def maximize_korean_font_size(self, min_size: int = 10, target_fill_ratio: float = 0.8) -> int:
+    def maximize_korean_font_size(
+        self, min_size: int = 10, target_fill_ratio: float = 0.8
+    ) -> int:
         """
         Optimize the font size to better fill the entire text box area, optimized for Korean text.
 
@@ -521,17 +526,19 @@ class TextBlock(object):
         # Calculate box area
         box_area = self.xywh[2] * self.xywh[3]  # width * height
 
-        if box_area <= 0 :
+        if box_area <= 0:
             return self.font_size
-        
+
         # Initial font size guess (proportional to box height)
         font_size = max(min_size, int(self.xywh[3] * 0.6))
-        
+
         best_font_size = font_size
         best_fill_ratio = 0.0
 
         # Binary search for optimal font size
-        left, right = min_size, int(self.xywh[3] * 1.2)  # Upper bound slightly larger than box height
+        left, right = min_size, int(
+            self.xywh[3] * 1.2
+        )  # Upper bound slightly larger than box height
 
         while left <= right:
             mid_font_size = (left + right) // 2
@@ -548,19 +555,19 @@ class TextBlock(object):
             if current_fill_ratio > best_fill_ratio:
                 best_fill_ratio = current_fill_ratio
                 best_font_size = mid_font_size
-            
 
             if current_fill_ratio >= target_fill_ratio:
                 left = mid_font_size + 1
             else:
                 right = mid_font_size - 1
 
-
-        logger.debug(f"{self.translation[:4]}: Font size: {self.font_size} => {best_font_size}, Fill ratio: {best_fill_ratio}")
+        self.logger.debug(
+            f"{self.translation[:4]}: Font size: {self.font_size} => {best_font_size}, Fill ratio: {best_fill_ratio}"
+        )
         self.font_size = best_font_size
         self._alignment = "left"
         return self.font_size
-        
+
     def estimate_text_area(self, font_size: int) -> float:
         """
         Estimates the area that the text will occupy with the given font size.
@@ -574,26 +581,28 @@ class TextBlock(object):
         """
         if not self.translation:
             return 0.0
-        
+
         text = self.get_translation_for_rendering()
 
         if not text:
             return 0.0
 
         text_length = len(text)
-        
+
         # Basic assumption: each Korean character is roughly square
         # We add some padding to account for character spacing
-        avg_char_width = font_size * 0.8  
+        avg_char_width = font_size * 0.8
         avg_char_height = font_size * 0.9
 
         # Estimate the number of lines based on available width and character width
-        estimated_line_width = self.xywh[2] 
+        estimated_line_width = self.xywh[2]
         estimated_chars_per_line = max(1, int(estimated_line_width / avg_char_width))
-        estimated_num_lines = (text_length + estimated_chars_per_line - 1) // estimated_chars_per_line
+        estimated_num_lines = (
+            text_length + estimated_chars_per_line - 1
+        ) // estimated_chars_per_line
 
         # Estimate the total text area
-        estimated_text_width = min(estimated_line_width, text_length*avg_char_width)
+        estimated_text_width = min(estimated_line_width, text_length * avg_char_width)
         estimated_text_height = estimated_num_lines * avg_char_height
         estimated_text_area = estimated_text_width * estimated_text_height
 
@@ -739,13 +748,15 @@ def rearrange_vertical_text_to_horizontal(
     # Sort vertical captions by reading order (top to bottom, right to left)
     vertical_caption_blocks.sort(key=lambda blk: (blk.center[0], blk.center[1]))
 
-    logger.debug(
+    self.logger.debug(
         f"Found {len(vertical_caption_blocks)} vertical caption blocks to rearrange"
     )
 
     # Find candidate locations for placement
     candidate_locations = find_candidate_locations(img, horizontal_blocks)
-    logger.debug(f"Found {len(candidate_locations)} candidate locations for placement")
+    self.logger.debug(
+        f"Found {len(candidate_locations)} candidate locations for placement"
+    )
 
     # Process each vertical caption block
     result_blocks = horizontal_blocks.copy()
@@ -774,11 +785,11 @@ def rearrange_vertical_text_to_horizontal(
 
             # Add this rearranged block to our result list
             result_blocks.append(vcap_block)
-            logger.debug(
+            self.logger.debug(
                 f"Rearranged block: {vcap_block.translation[:10]}... to {best_location}"
             )
         else:
-            logger.debug(
+            self.logger.debug(
                 f"Could not find placement for block: {vcap_block.translation[:10]}..."
             )
 
@@ -920,8 +931,10 @@ def find_best_placement(
 
     # Calculate the original area - we'll preserve this
     original_area = original_width * original_height
-    
-    logger.debug(f"Original dimensions: {original_width}x{original_height}, area: {original_area}")
+
+    self.logger.debug(
+        f"Original dimensions: {original_width}x{original_height}, area: {original_area}"
+    )
 
     # Step 1: Calculate new width based on text length and other factors
     if text_length > 0:
@@ -945,47 +958,51 @@ def find_best_placement(
 
     # Apply reasonable constraints while preserving area
     img_height, img_width = img.shape[:2]
-    
+
     # Maximum width constraint (don't exceed image width)
     max_width = min(img_width - 20, 800)  # Allow larger widths but stay within image
     if new_width > max_width:
         new_width = max_width
         new_height = original_area / new_width
-    
+
     # Maximum height constraint (don't be too tall)
     max_height = min(img_height * 0.3, 150)  # Allow taller heights but stay reasonable
     if new_height > max_height:
         new_height = max_height
         new_width = original_area / new_height
-    
+
     # Minimum size constraints - only apply if absolutely necessary
     min_width = 80
     min_height = 20
-    
+
     if new_width < min_width:
         new_width = min_width
         new_height = original_area / new_width
-    
+
     if new_height < min_height:
         new_height = min_height
         new_width = original_area / new_height
-    
+
     # Final rounding to integers
     block_width = int(new_width)
     block_height = int(new_height)
-    
+
     # Check area preservation
     new_area = block_width * block_height
     area_ratio = new_area / original_area
-    
-    logger.debug(f"New dimensions: {block_width}x{block_height}, area: {new_area}, ratio: {area_ratio:.2f}")
-    
+
+    self.logger.debug(
+        f"New dimensions: {block_width}x{block_height}, area: {new_area}, ratio: {area_ratio:.2f}"
+    )
+
     # If area is significantly smaller, try to increase dimensions
     if area_ratio < 0.9:
         adjustment_factor = (original_area / new_area) ** 0.5
         block_width = int(block_width * adjustment_factor)
         block_height = int(block_height * adjustment_factor)
-        logger.debug(f"Area adjusted dimensions: {block_width}x{block_height}, new area: {block_width*block_height}")
+        self.logger.debug(
+            f"Area adjusted dimensions: {block_width}x{block_height}, new area: {block_width*block_height}"
+        )
 
     # Score each candidate location
     best_score = float("inf")
@@ -1079,7 +1096,9 @@ def find_best_placement(
         adjusted_width = int(block_width * 0.9)
         adjusted_height = int(block_height * 0.9)
         min_rect = (10, 10, 10 + adjusted_width, 10 + adjusted_height)
-        logger.debug(f"Using last resort placement with dimensions: {adjusted_width}x{adjusted_height}")
+        self.logger.debug(
+            f"Using last resort placement with dimensions: {adjusted_width}x{adjusted_height}"
+        )
         return min_rect
 
     return best_location
