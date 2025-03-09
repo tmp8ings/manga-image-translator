@@ -346,7 +346,6 @@
             formData.append('config', config)
 
             if (this.isZip(this.file)) {
-                // New job-based structure for zip processing.
                 fetch(`${BASE_URI}translate/with-form/zip-submit`, {
                     method: 'POST',
                     body: formData
@@ -358,35 +357,27 @@
                         fetch(`${BASE_URI}translate/with-form/zip-status/${job_id}`)
                         .then(resp => resp.json())
                         .then(statusJson => {
-                            console.log(statusJson);
-                            if (statusJson.status === "finished") {
-                                // Compute translated file name; e.g., "a.zip" becomes "a-translated.zip"
+                            console.log("Polling job:", job_id, "status:", statusJson.status);
+                            // trim the status to remove extra spaces
+                            const currStatus = statusJson.status.trim();
+                            if (currStatus === "finished") {
                                 const origName = this.file.name || "download.zip";
                                 const translatedName = origName.replace(/\.zip$/i, "") + "-translated.zip";
-                                // Save job_id in the download item.
                                 this.downloads.push({ job_id: job_id, name: translatedName, url: `${BASE_URI}translate/with-form/zip-download/${job_id}` });
-                                console.log(this.downloads)
                                 this.status = "finished";
                                 this.finishedMessage = "Translation completed successfully!";
-                                setTimeout(() => { this.finishedMessage = "" }, 5000) // clear after 5 seconds
-                            } else if(statusJson.status === "error") {
+                                setTimeout(() => { this.finishedMessage = "" }, 5000);
+                            } else if (currStatus === "error") {
                                 this.status = "error";
                             } else {
-                                // Continue polling every 2 seconds.
                                 setTimeout(pollStatus, 2000);
                             }
                         })
-                        .catch(err => {
-                            console.error(err);
-                            this.status = 'error-disconnect';
-                        });
+                        .catch(err => { console.error(err); this.status = 'error-disconnect'; });
                     };
                     pollStatus();
                 })
-                .catch(error => {
-                    console.error(error);
-                    this.status = 'error-disconnect';
-                });
+                .catch(error => { console.error(error); this.status = 'error-disconnect'; });
             } else {
                 const processChunk = (value) => {
                     if (this.error) return;
