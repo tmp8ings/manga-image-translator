@@ -36,7 +36,7 @@ name_and_hash = {
     'detect.ckpt': '69080aea78de0803092bc6b751ae283ca463011de5f07e1d20e6491b05571a30',
 }
 
-name = 'detect-20240910.ckpt'
+name = 'detect-20241225.ckpt'
 
 class DefaultDetector(OfflineDetector):
     _MODEL_MAPPING = {
