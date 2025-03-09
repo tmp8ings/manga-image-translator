@@ -145,6 +145,7 @@
         <div v-if="result && !isZip(file)" class="flex flex-col items-center">
           <img class="my-2" :src="resultUri" />
           <button
+            type="button"
             class="px-2 py-1 text-center rounded-md text-blue-800 border-2 border-blue-300"
             @click="clear"
           >
@@ -158,6 +159,7 @@
           <div v-if="error" class="flex flex-col items-center gap-2">
             <div style="color: crimson">{{ statusText }}</div>
             <button
+              type="button"
               class="px-2 py-1 text-center rounded-md text-blue-800 border-2 border-blue-300"
               @click="clear"
             >
@@ -284,6 +286,7 @@
             class="mb-1 flex gap-2 items-center"
           >
             <button
+              type="button"
               class="px-3 py-1 rounded-md border bg-blue-100 text-blue-800"
               @click="downloadZip(item.url, item.name)"
             >
