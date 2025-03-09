@@ -113,7 +113,6 @@ class ConfigGPT:
 
     @property
     def chat_sample(self) -> Dict[str, List[str]]:
-        logger.debug(f"Chat sample: {self._CHAT_SAMPLE['Korean']}")
         return self._config_get("chat_sample", self._CHAT_SAMPLE)
 
     @property
@@ -303,7 +302,7 @@ class ConfigGPT:
             int: Calculated line limit that works for both texts
         """
         # Constants for limiting
-        MAX_CHARS = 4000  # Maximum total characters we want to keep
+        MAX_CHARS = 1000  # Maximum total characters we want to keep
         MIN_LINES = 3  # Minimum number of lines to keep
         MAX_LINES = 30  # Maximum number of lines to keep
 

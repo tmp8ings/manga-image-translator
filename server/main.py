@@ -359,9 +359,15 @@ if __name__ == "__main__":
     args.start_instance = True
 
     try:
-        # Set Uvicorn log level
+        # Set Uvicorn log level and extend keep-alive timeout for large zip responses
         log_level = "debug" if args.verbose else "info"
-        uvicorn.run(app, host=args.host, port=args.port, log_level=log_level)
+        uvicorn.run(
+            app,
+            host=args.host,
+            port=args.port,
+            log_level=log_level,
+            timeout_keep_alive=3600  # increased timeout to handle long processing times
+        )
         proc = prepare(args)
         print("Nonce: " + nonce)
 
