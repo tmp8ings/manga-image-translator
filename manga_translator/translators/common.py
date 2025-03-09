@@ -219,7 +219,7 @@ class CommonTranslator(InfererModule):
         # Merge with the queries without text
         for i, trans in enumerate(translations):
             final_translations[query_indices[i]] = trans
-            self.logger.info(f'{i}: {queries[i]} => {trans}')
+            # self.logger.info(f'{i}: {queries[i]} => {trans}')
 
         return final_translations
 

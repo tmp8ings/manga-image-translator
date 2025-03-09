@@ -169,9 +169,9 @@ class GeminiTranslator(ConfigGPT, CommonTranslator):
         # Build messages using dictionaries instead of Content objects
         messages = []
         if to_lang in self.chat_sample:
-            self.logger.debug(
-                f"Using chat sample for {to_lang}: {self.chat_sample[to_lang]}"
-            )
+            # self.logger.debug(
+            #     f"Using chat sample for {to_lang}: {self.chat_sample[to_lang]}"
+            # )
             messages.append(
                 {"role": "user", "parts": [{"text": self.chat_sample[to_lang][0]}]}
             )
@@ -197,9 +197,9 @@ class GeminiTranslator(ConfigGPT, CommonTranslator):
                 stream=False,
             )
             response_text = response.text
-            self.logger.debug(
-                "\n-- Gemini Response --\n" + response_text + "\n------------------\n"
-            )
+            # self.logger.debug(
+            #     "\n-- Gemini Response --\n" + response_text + "\n------------------\n"
+            # )
 
             if not response.candidates:
                 raise ValueError("Empty response from Gemini API")

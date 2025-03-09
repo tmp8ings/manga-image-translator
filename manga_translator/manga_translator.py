@@ -945,9 +945,9 @@ class MangaTranslator:
                 translation = translation.upper()
             region.translation = translation
             region.target_lang = config.translator.target_lang
-            logger.debug(
-                f"alignment: {config.render.alignment}, direction: {config.render.direction}, region alignment: {region._alignment}, region direction: {region._direction}"
-            )
+            # logger.debug(
+            #     f"alignment: {config.render.alignment}, direction: {config.render.direction}, region alignment: {region._alignment}, region direction: {region._direction}"
+            # )
             region._alignment = config.render.alignment
             region._direction = config.render.direction
 
