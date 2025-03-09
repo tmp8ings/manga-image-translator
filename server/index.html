@@ -210,6 +210,7 @@
 
         file: null,
         downloads: [],  // now each download item will include job_id, name, and url
+        finishedMessage: '', // new property for visual feedback on finish
         zipDownloadUrl: null,  // remove use if desired but kept for compatibility
         get fileUri() {
             return this.file ? URL.createObjectURL(this.file) : null
@@ -357,13 +358,17 @@
                         fetch(`${BASE_URI}translate/with-form/zip-status/${job_id}`)
                         .then(resp => resp.json())
                         .then(statusJson => {
+                            console.log(statusJson);
                             if (statusJson.status === "finished") {
                                 // Compute translated file name; e.g., "a.zip" becomes "a-translated.zip"
                                 const origName = this.file.name || "download.zip";
                                 const translatedName = origName.replace(/\.zip$/i, "") + "-translated.zip";
                                 // Save job_id in the download item.
                                 this.downloads.push({ job_id: job_id, name: translatedName, url: `${BASE_URI}translate/with-form/zip-download/${job_id}` });
+                                console.log(this.downloads)
                                 this.status = "finished";
+                                this.finishedMessage = "Translation completed successfully!";
+                                setTimeout(() => { this.finishedMessage = "" }, 5000) // clear after 5 seconds
                             } else if(statusJson.status === "error") {
                                 this.status = "error";
                             } else {
@@ -502,7 +507,10 @@
         }
     }).mount()
 </script>
-<!-- New section to list finished zip download buttons with delete option -->
+<!-- New section to list finished zip download buttons with delete option and show finished visual feedback -->
+<div v-if="finishedMessage" class="fixed top-4 left-1/2 transform -translate-x-1/2 bg-green-200 text-green-800 px-4 py-2 rounded shadow-md">
+    {{ finishedMessage }}
+</div>
 <div v-if="downloads.length > 0" class="fixed bottom-4 right-4 p-4 bg-white rounded shadow-md">
     <h3 class="text-lg font-semibold mb-2">Download Translated Zips</h3>
     <div v-for="(item, index) in downloads" :key="index" class="mb-1 flex gap-2 items-center">
