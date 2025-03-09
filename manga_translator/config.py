@@ -300,7 +300,7 @@ class ColorizerConfig(BaseModel):
     """Colorization model to use."""
 
 class OcrConfig(BaseModel):
-    use_mocr_merge: bool = True
+    use_mocr_merge: bool = False
     """Use bbox merge when Manga OCR inference."""
     ocr: Ocr = Ocr.mocr
     """Optical character recognition (OCR) model to use"""
