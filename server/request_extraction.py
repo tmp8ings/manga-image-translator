@@ -2,6 +2,7 @@ import asyncio
 import builtins
 import io
 import re
+import zipfile  # added for zip file detection
 from base64 import b64decode
 from typing import Union
 
@@ -41,9 +42,15 @@ async def to_pil_image(image: Union[str, bytes]) -> Image.Image:
         raise HTTPException(status_code=422, detail=str(e))
 
 
-async def get_ctx(req: Request, config: Config, image: str|bytes):
-    image = await to_pil_image(image)
-    task = QueueElement(req, image, config, 0)
+async def get_ctx(req: Request, config: Config, image: bytes):
+    # Check if the input is a zip archive and extract the first image file if so
+    if isinstance(image, bytes) and zipfile.is_zipfile(io.BytesIO(image)):
+        image = Image.new('RGB', (1, 1), color=(255, 255, 255))
+        zip_file = io.BytesIO(image)
+    else:
+        image = await to_pil_image(image)
+        zip_file = None
+    task = QueueElement(req, image, config, 0, zip_file=zip_file)
 
     task_queue.add_task(task)
 

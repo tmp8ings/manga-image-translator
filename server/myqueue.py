@@ -13,9 +13,11 @@ from server.sent_data_internal import NotifyType
 class QueueElement:
     req: Request
     image: Image.Image | str
+    zip_file: bytes | None = None
     config: Config
 
-    def __init__(self, req: Request, image: Image.Image, config: Config, length):
+    def __init__(self, req: Request, image: Image.Image, config: Config, length, *, zip_file: bytes = None):
+        self.zip_file = zip_file
         self.req = req
         if length > 10:
             #todo: store image in "upload-cache" folder
@@ -91,9 +93,9 @@ async def wait_in_queue(task: QueueElement, notify: NotifyType):
             if notify:
                 notify(4, b"")
             if notify:
-                await instance.sent_stream(task.image, task.config, notify)
+                await instance.sent_stream(task.image, task.config, notify, zip_file=task.zip_file)
             else:
-                result = await instance.sent(task.image, task.config)
+                result = await instance.sent(task.image, task.config, zip_file=task.zip_file)
 
             await executor_instances.free_executor(instance)
 

@@ -16,11 +16,11 @@ class ExecutorInstance(BaseModel):
     def free_executor(self):
         self.busy = False
 
-    async def sent(self, image: Image, config: Config):
-        return await fetch_data("http://"+self.ip+":"+str(self.port)+"/simple_execute/translate", image, config)
+    async def sent(self, image: Image, config: Config, *, zip_file: bytes = None):
+        return await fetch_data("http://"+self.ip+":"+str(self.port)+"/simple_execute/translate", image, config, zip_file=zip_file)
 
-    async def sent_stream(self, image: Image, config: Config, sender: NotifyType):
-        await fetch_data_stream("http://"+self.ip+":"+str(self.port)+"/execute/translate", image, config, sender)
+    async def sent_stream(self, image: Image, config: Config, sender: NotifyType, *, zip_file: bytes = None):
+        await fetch_data_stream("http://"+self.ip+":"+str(self.port)+"/execute/translate", image, config, sender, zip_file=zip_file)
 
 class Executors:
     def __init__(self):

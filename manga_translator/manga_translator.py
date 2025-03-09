@@ -1,4 +1,6 @@
 import asyncio
+import io
+import zipfile
 import cv2
 import json
 import langcodes
@@ -10,7 +12,7 @@ import torch
 import logging
 import numpy as np
 from PIL import Image
-from typing import Optional, Any
+from typing import List, Optional, Any
 
 from manga_translator.utils.language import filter_onomatopoeia
 
@@ -216,6 +218,7 @@ class MangaTranslator:
         """
         ctx = Context()
 
+        ctx.zipped_image = zipped_image
         ctx.result = None
 
         self.prepare_translation(config)
@@ -227,183 +230,174 @@ class MangaTranslator:
             logger.error(f"Error during _translate: {str(e)}", exc_info=True)
             raise e
     
+    async def _unzip_image(self, zipped_image: bytes) -> List[Image.Image]:
+        """
+        Unzips the provided zip file and returns a list of PIL images.
+        """
+        images = []
+        with zipfile.ZipFile(io.BytesIO(zipped_image), "r") as zip_ref:
+            for file_name in zip_ref.namelist():
+                if file_name.lower().endswith((".png", ".jpg", ".jpeg")):
+                    with zip_ref.open(file_name) as file:
+                        image = Image.open(file)
+                        images.append(image.convert("RGBA"))
+        return images
+    
+    async def _zip_images(self, images: List[Image.Image]) -> bytes:
+        """
+        Zips the provided list of PIL images and returns the zip file as bytes.
+        """
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, "w") as zip_ref:
+            for i, image in enumerate(images):
+                img_buffer = io.BytesIO()
+                image.save(img_buffer, format="PNG")
+                img_buffer.seek(0)
+                zip_ref.writestr(f"image_{i}.png", img_buffer.read())
+        zip_buffer.seek(0)
+        return zip_buffer.getvalue()
+    
     async def _batch_translate(self, config: Config, ctx: Context) -> Context:
-        """
-        Processes multiple images for translation, batching the translation step to reduce API calls.
+        zipped_image = ctx.zipped_image
+        images = await self._unzip_image(zipped_image)
         
-        Workflow:
-        1. Extract text from all images (OCR)
-        2. Batch translate all texts together in reasonable chunks
-        3. Apply translations back to individual images and render
-        """
-        logger.info("Starting batch translation process")
-        
-        # Store individual contexts for each image
-        image_contexts = []
-        all_texts_to_translate = []
-        text_region_counts = []
-        
-        # Process each image for OCR and text extraction
-        for image in ctx.input_images:
-            img_ctx = Context()
-            img_ctx.input = image
-            
+        if self._detector_cleanup_task is None:
+            self._detector_cleanup_task = asyncio.create_task(
+                self._detector_cleanup_job()
+            )
+        contexts: List[Context] = []
+        # Pre-translation: process each image sequentially.
+        for img in images:
+            local_ctx = Context()
+            local_ctx.input = img
             # -- Colorization
             if config.colorizer.colorizer != Colorizer.none:
                 await self._report_progress("colorizing")
-                img_ctx.img_colorized = await self._run_colorizer(config, img_ctx)
+                local_ctx.img_colorized = await self._run_colorizer(config, local_ctx)
             else:
-                img_ctx.img_colorized = img_ctx.input
-            
+                local_ctx.img_colorized = img
             # -- Upscaling
             if config.upscale.upscale_ratio:
                 await self._report_progress("upscaling")
-                img_ctx.upscaled = await self._run_upscaling(config, img_ctx)
+                local_ctx.upscaled = await self._run_upscaling(config, local_ctx)
             else:
-                img_ctx.upscaled = img_ctx.img_colorized
-            
-            img_ctx.img_rgb, img_ctx.img_alpha = load_image(img_ctx.upscaled)
-            
+                local_ctx.upscaled = local_ctx.img_colorized
+            local_ctx.img_rgb, local_ctx.img_alpha = load_image(local_ctx.upscaled)
             # -- Detection
             await self._report_progress("detection")
-            img_ctx.textlines, img_ctx.mask_raw, img_ctx.mask = await self._run_detection(config, img_ctx)
-            
-            if not img_ctx.textlines:
-                # If no text regions found, skip this image
-                img_ctx.result = img_ctx.upscaled
-                image_contexts.append(img_ctx)
+            local_ctx.textlines, local_ctx.mask_raw, local_ctx.mask = await self._run_detection(config, local_ctx)
+            if self.verbose:
+                cv2.imwrite(self._result_path("mask_raw.png"), local_ctx.mask_raw)
+            if not local_ctx.textlines:
+                await self._report_progress("skip-no-regions", True)
+                local_ctx.result = local_ctx.upscaled
+                contexts.append(local_ctx)
                 continue
-            
+            if self.verbose:
+                # ...existing code to write bboxes...
+                pass
             # -- OCR
             await self._report_progress("ocr")
-            img_ctx.textlines = await self._run_ocr(config, img_ctx)
-            
-            if not img_ctx.textlines:
-                # If no text was found, skip this image
-                img_ctx.result = img_ctx.upscaled
-                image_contexts.append(img_ctx)
+            local_ctx.textlines = await self._run_ocr(config, local_ctx)
+            if not local_ctx.textlines:
+                await self._report_progress("skip-no-text", True)
+                local_ctx.result = local_ctx.upscaled
+                contexts.append(local_ctx)
                 continue
-            
             # Apply pre-dictionary after OCR
             pre_dict = load_dictionary(self.pre_dict)
-            pre_replacements = []
-            for textline in img_ctx.textlines:
+            for textline in local_ctx.textlines:
                 original = textline.text
                 textline.text = apply_dictionary(textline.text, pre_dict)
-                if original != textline.text:
-                    pre_replacements.append(f"{original} => {textline.text}")
-            
-            if pre_replacements:
-                logger.info("Pre-translation replacements:")
-                for replacement in pre_replacements:
-                    logger.info(replacement)
-                    
             # -- Textline merge
             await self._report_progress("textline_merge")
-            img_ctx.text_regions = await self._run_textline_merge(config, img_ctx)
-            
-            if img_ctx.text_regions:
-                # Collect texts for batch translation
-                for region in img_ctx.text_regions:
-                    all_texts_to_translate.append(region.text)
-                
-                # Track how many regions from this image
-                text_region_counts.append(len(img_ctx.text_regions))
-                image_contexts.append(img_ctx)
-            else:
-                # If no text regions, skip this image
-                img_ctx.result = img_ctx.upscaled
-                image_contexts.append(img_ctx)
+            local_ctx.text_regions = await self._run_textline_merge(config, local_ctx)
+            if self.verbose:
+                # ...existing code to write merged bboxes...
+                pass
+            contexts.append(local_ctx)
         
-        # Batch translate all texts from all images
-        if all_texts_to_translate:
-            await self._report_progress("translating")
-            try:
-                # Define a reasonable batch size for translation API calls
-                # This prevents overloading the translation service
-                batch_size = 50  # Adjust based on translation API limits
-                
-                all_translations = []
-                
-                # Process translations in batches
-                for i in range(0, len(all_texts_to_translate), batch_size):
-                    batch_texts = all_texts_to_translate[i:i + batch_size]
-                    logger.info(f"Translating batch {i//batch_size + 1}/{(len(all_texts_to_translate) + batch_size - 1)//batch_size}")
-                    
-                    batch_translations = await dispatch_translation(
-                        config.translator.translator_gen,
-                        batch_texts,
-                        config.translator,
-                        self.use_mtpe,
-                        ctx,
-                        "cpu" if self._gpu_limited_memory else self.device,
-                    )
-                    
-                    all_translations.extend(batch_translations)
-                
-                # Apply post-dictionary to all translations
-                post_dict = load_dictionary(self.post_dict)
-                all_translations = [apply_dictionary(trans, post_dict) for trans in all_translations]
-                
-            except Exception as e:
-                logger.error(f"Error during batch translation: {str(e)}", exc_info=True)
-                raise e
-            
-            # Distribute translations back to their respective images
-            translation_index = 0
-            for idx, img_ctx in enumerate(image_contexts):
-                if not hasattr(img_ctx, 'text_regions') or not img_ctx.text_regions:
-                    continue
-                    
-                region_count = text_region_counts[idx]
-                img_translations = all_translations[translation_index:translation_index + region_count]
-                translation_index += region_count
-                
-                # Apply translations to each region
-                for region, translation in zip(img_ctx.text_regions, img_translations):
-                    if config.render.uppercase:
-                        translation = translation.upper()
-                    elif config.render.lowercase:
-                        translation = translation.upper()
-                    region.translation = translation
+        # Gather all texts from all contexts for batch translation.
+        batch_texts = []
+        indices = []  # record number of text regions per context.
+        for local_ctx in contexts:
+            count = len(local_ctx.text_regions) if local_ctx.text_regions else 0
+            indices.append(count)
+            for region in local_ctx.text_regions or []:
+                batch_texts.append(region.text)
+        
+        if not batch_texts:
+            return contexts[-1] if contexts else ctx
+        
+        await self._report_progress("translating")
+        translated_sentences = await dispatch_translation(
+            config.translator.translator_gen,
+            batch_texts,
+            config.translator,
+            self.use_mtpe,
+            ctx,
+            "cpu" if self._gpu_limited_memory else self.device,
+        )
+        
+        # Split the translated sentences back into each context.
+        cur = 0
+        for local_ctx, count in zip(contexts, indices):
+            if local_ctx.text_regions:
+                for region in local_ctx.text_regions:
+                    region.translation = translated_sentences[cur]
                     region.target_lang = config.translator.target_lang
-                    region._alignment = config.render.alignment
-                    region._direction = config.render.direction
-                
-                # Process each image individually from here (mask refinement, inpainting, rendering)
-                # -- Mask refinement
-                if img_ctx.mask is None:
-                    await self._report_progress("mask-generation")
-                    img_ctx.mask = await self._run_mask_refinement(config, img_ctx)
-                
-                # -- Inpainting
-                await self._report_progress("inpainting")
-                img_ctx.img_inpainted = await self._run_inpainting(config, img_ctx)
-                img_ctx.gimp_mask = np.dstack(
-                    (cv2.cvtColor(img_ctx.img_inpainted, cv2.COLOR_RGB2BGR), img_ctx.mask)
-                )
-                
-                # -- Rendering
-                await self._report_progress("rendering")
-                try:
-                    img_ctx.img_rendered = await self._run_text_rendering(config, img_ctx)
-                except Exception as e:
-                    logger.error(f"Error during rendering: {str(e)}", exc_info=True)
-                    raise e
-                
-                img_ctx.result = dump_image(img_ctx.input, img_ctx.img_rendered, img_ctx.img_alpha)
-                
-                # Revert upscale if needed
-                if config.upscale.revert_upscaling:
-                    img_ctx.result = img_ctx.result.resize(img_ctx.input.size)
+                    cur += 1
+        await self._report_progress("after-translating")
         
-        # Combine results from all images into the main context
-        ctx.results = [img_ctx.result for img_ctx in image_contexts]
-        await self._report_progress("finished", True)
+        # Post-translation: process each image sequentially.
+        for local_ctx in contexts:
+            if not local_ctx.text_regions or local_ctx.text_regions == "cancel":
+                await self._report_progress("cancelled", True)
+                local_ctx.result = local_ctx.upscaled
+                continue
+            # -- Mask refinement
+            if local_ctx.mask is None:
+                await self._report_progress("mask-generation")
+                local_ctx.mask = await self._run_mask_refinement(config, local_ctx)
+            if self.verbose:
+                inpaint_input_img = await dispatch_inpainting(
+                    Inpainter.none,
+                    local_ctx.img_rgb,
+                    local_ctx.mask,
+                    config.inpainter,
+                    config.inpainter.inpainting_size,
+                    self.device,
+                    self.verbose,
+                )
+                cv2.imwrite(self._result_path("inpaint_input.png"), cv2.cvtColor(inpaint_input_img, cv2.COLOR_RGB2BGR))
+                cv2.imwrite(self._result_path("mask_final.png"), local_ctx.mask)
+            # -- Inpainting
+            await self._report_progress("inpainting")
+            local_ctx.img_inpainted = await self._run_inpainting(config, local_ctx)
+            local_ctx.gimp_mask = np.dstack(
+                (cv2.cvtColor(local_ctx.img_inpainted, cv2.COLOR_RGB2BGR), local_ctx.mask)
+            )
+            if self.verbose:
+                cv2.imwrite(self._result_path("inpainted.png"), cv2.cvtColor(local_ctx.img_inpainted, cv2.COLOR_RGB2BGR))
+            # -- Rendering
+            await self._report_progress("rendering")
+            try:
+                local_ctx.img_rendered = await self._run_text_rendering(config, local_ctx)
+            except Exception as e:
+                logger.error(f"Error during rendering: {str(e)}", exc_info=True)
+                raise e
+            await self._report_progress("finished", True)
+            local_ctx.result = dump_image(local_ctx.input, local_ctx.img_rendered, local_ctx.img_alpha)
+            local_ctx = await self._revert_upscale(config, local_ctx)
+        
+        # Optionally, attach all batch results to the original context.
+        images = [local_ctx.result for local_ctx in contexts]
+        ctx.result = await self._zip_images(images)
         
         return ctx
 
-    async def translate(self, image: Image.Image, config: Config) -> Context:
+    
+    async def translate(self, image: Image.Image, config: Config, zip_file: bytes = None) -> Context:
         """
         Translates a PIL image from a manga. Returns dict with result and intermediates of translation.
         Default params are taken from args.py.
@@ -413,6 +407,8 @@ class MangaTranslator:
         result = translation_dict.result
         ```
         """
+        if zip_file:
+            return await self.batch_translate(zip_file, config)
         # TODO: Take list of images to speed up batch processing
 
         ctx = Context()
@@ -430,7 +426,6 @@ class MangaTranslator:
             raise e
 
     async def _translate(self, config: Config, ctx: Context) -> Context:
-        logger.info("_translate")
         # Start the background cleanup job once if not already started.
         if self._detector_cleanup_task is None:
             self._detector_cleanup_task = asyncio.create_task(

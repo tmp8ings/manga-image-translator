@@ -29,6 +29,7 @@ BASE_PATH = os.path.dirname(MODULE_PATH)
 class ContextType(Protocol):
     input: Image.Image
     image: np.ndarray
+    zipped_image: Any
     mask: Optional[np.ndarray]
     textlines: List["Quadrilateral"]
     # boxes: List[Any]
