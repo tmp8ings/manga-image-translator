@@ -24,7 +24,7 @@ from .original import OriginalTranslator
 from .sakura import SakuraTranslator
 from .qwen2 import Qwen2Translator, Qwen2BigTranslator
 from .groq import GroqTranslator
-from .ollama import OllamaTranslator
+from .custom_openai import CustomOpenAiTranslator
 from .gemini import Gemini2FlashExp, Gemini2FlashThinkingExp, Gemini2ProExp, GeminiTranslator
 from ..config import Translator, TranslatorConfig, TranslatorChain
 from ..utils import Context
@@ -55,8 +55,8 @@ TRANSLATORS = {
     Translator.original: OriginalTranslator,
     Translator.sakura: SakuraTranslator,
     Translator.deepseek: DeepseekTranslator,
-    Translator.groq: GroqTranslator,
-    Translator.ollama: OllamaTranslator,
+    Translator.groq:GroqTranslator,
+    Translator.custom_openai: CustomOpenAiTranslator,
     Translator.gemini_pro: Gemini2ProExp,
     Translator.gemini_flash: Gemini2FlashExp,
     Translator.gemini_thinking: Gemini2FlashThinkingExp,
