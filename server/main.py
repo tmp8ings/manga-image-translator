@@ -129,11 +129,11 @@ async def json_form(req: Request, image: UploadFile = File(...), config: str = F
     ctx = await get_ctx(req, Config.parse_raw(config), img)
     return to_translation(ctx)
 
-@app.post("/translate/with-form/zip", response_class=StreamingResponse, tags=["api", "form"],response_description="custom byte structure for decoding look at examples in 'examples/response.*'")
-async def bytes_form(req: Request, image: UploadFile = File(...), config: str = Form("{}")):
+@app.post("/translate/with-form/zip", response_class=StreamingResponse, tags=["api", "form"], response_description="stream zip file bytes")
+async def zip_form(req: Request, image: UploadFile = File(...), config: str = Form("{}")) -> StreamingResponse:
     img = await image.read()
     ctx = await get_ctx(req, Config.parse_raw(config), img)
-    return StreamingResponse(content=ctx.result)
+    return StreamingResponse(io.BytesIO(ctx.result), media_type="application/zip")
 
 @app.post("/translate/with-form/bytes", response_class=StreamingResponse, tags=["api", "form"],response_description="custom byte structure for decoding look at examples in 'examples/response.*'")
 async def bytes_form(req: Request, image: UploadFile = File(...), config: str = Form("{}")):
