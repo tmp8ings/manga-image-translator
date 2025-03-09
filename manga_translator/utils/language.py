@@ -88,7 +88,7 @@ def is_japanese_onomatopoeia(text: str) -> bool:
 
 def is_onomatopoeia(text: str):
     result = is_japanese_onomatopoeia(text)
-    logger.debug(f"Text: {text}, Is Onomatopoeia: {result}")
+    # logger.debug(f"Text: {text}, Is Onomatopoeia: {result}")
     return result
 
 

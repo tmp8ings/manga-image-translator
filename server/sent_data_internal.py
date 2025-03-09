@@ -36,12 +36,14 @@ async def fetch_data(
     config: Config,
     headers: Mapping[str, str] = {},
     *,
-    zip_file: bytes = None
+    zip_file: bytes = None,
+    timeout: float = 3600
 ):
     attributes = {"image": image, "config": config, "zip_file": zip_file}
     data = pickle.dumps(attributes)
 
-    async with aiohttp.ClientSession() as session:
+    client_timeout = aiohttp.ClientTimeout(total=3600)
+    async with aiohttp.ClientSession(timeout=client_timeout) as session:
         async with session.post(url, data=data, headers=headers) as response:
             if response.status == 200:
                 return pickle.loads(await response.read())

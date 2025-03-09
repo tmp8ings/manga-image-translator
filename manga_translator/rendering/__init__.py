@@ -366,9 +366,9 @@ def render(
 
     # Add the missing perspective transform calculation
     M = cv2.getPerspectiveTransform(src_points, dst_points.astype(np.float32))
-    logger.debug(
-        f"for {region.translation[:3]}, souce points {src_points}, dst_points {dst_points}"
-    )
+    # logger.debug(
+    #     f"for {region.translation[:3]}, souce points {src_points}, dst_points {dst_points}"
+    # )
     rgba_region = cv2.warpPerspective(
         box,
         M,
