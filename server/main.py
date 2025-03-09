@@ -27,7 +27,12 @@ from pathlib import Path
 from manga_translator import Config
 from server.instance import ExecutorInstance, executor_instances
 from server.myqueue import task_queue
-from server.request_extraction import get_ctx, while_polling, while_streaming, TranslateRequest
+from server.request_extraction import (
+    get_ctx,
+    while_polling,
+    while_streaming,
+    TranslateRequest,
+)
 from server.to_json import to_translation, TranslationResponse
 
 # Configure logging
@@ -369,13 +374,14 @@ def prepare(args):
 
 jobs = {}  # Global dictionary for zip jobs
 
+
 async def process_zip(job_id: str, req: Request, image_bytes: bytes, config_str: str):
     try:
         config_obj = Config.parse_raw(config_str)
         # Start while_polling in background so polling can update the task timestamp
         poll_task = asyncio.create_task(while_polling(req, config_obj, image_bytes))
         jobs[job_id]["poll_task"] = poll_task  # store the asyncio.Task
-        result, _ = await poll_task   # waiting for result from polling_in_queue
+        result, _ = await poll_task  # waiting for result from polling_in_queue
         # Store the bytes from context (result.result) instead of the context itself
         jobs[job_id]["result"] = result.result
         jobs[job_id]["status"] = "finished"
@@ -383,6 +389,7 @@ async def process_zip(job_id: str, req: Request, image_bytes: bytes, config_str:
         logger.error(f"Error processing zip job {job_id}: {str(e)}", exc_info=True)
         jobs[job_id]["status"] = "error"
         jobs[job_id]["error"] = str(e)
+
 
 @app.post(
     "/translate/with-form/zip-submit",
@@ -395,7 +402,13 @@ async def zip_submit(
     image_bytes = await image.read()
     job_id = str(uuid.uuid4())
     # Store creation time along with other keys
-    jobs[job_id] = {"status": "pending", "result": None, "error": None, "poll_task": None, "created": time.time()}
+    jobs[job_id] = {
+        "status": "pending",
+        "result": None,
+        "error": None,
+        "poll_task": None,
+        "created": time.time(),
+    }
     # Prune jobs: keep only the 5 most recent jobs
     if len(jobs) > 5:
         sorted_keys = sorted(jobs.keys(), key=lambda k: jobs[k]["created"])
@@ -405,6 +418,7 @@ async def zip_submit(
     # Start processing in background
     asyncio.create_task(process_zip(job_id, req, image_bytes, config))
     return JSONResponse(content={"job_id": job_id})
+
 
 @app.delete(
     "/translate/with-form/zip-delete/{job_id}",
@@ -418,6 +432,7 @@ async def zip_delete(job_id: str):
     del jobs[job_id]
     return JSONResponse(content={"detail": "Job deleted"})
 
+
 @app.get(
     "/translate/with-form/zip-status/{job_id}",
     tags=["api", "form"],
@@ -427,10 +442,15 @@ async def zip_status(job_id: str):
     job = jobs.get(job_id)
     if not job:
         raise HTTPException(404, detail="Job not found")
-    if job["status"] == "pending" and job.get("poll_task") is not None and not job["poll_task"].done():
+    if (
+        job["status"] == "pending"
+        and job.get("poll_task") is not None
+        and not job["poll_task"].done()
+    ):
         if hasattr(job["poll_task"], "queue_elem") and job["poll_task"].queue_elem:
             job["poll_task"].queue_elem.update_poll()
     return JSONResponse(content={"status": job["status"], "error": job["error"]})
+
 
 @app.get(
     "/translate/with-form/zip-download/{job_id}",
@@ -444,11 +464,14 @@ async def zip_download(job_id: str):
     if job["status"] != "finished":
         raise HTTPException(400, detail="Job not finished")
     zip_io = io.BytesIO(job["result"])
-    # Return response similar to /translate/with-form/zip endpoint
-    return StreamingResponse(
-        stream_zip_with_heartbeat(zip_io),
-        media_type="application/zip"
+
+    # Create response with proper headers for downloading
+    response = StreamingResponse(
+        stream_zip_with_heartbeat(zip_io), media_type="application/zip"
     )
+    response.headers["Content-Disposition"] = f"attachment"
+
+    return response
 
 
 # todo: restart if crash
