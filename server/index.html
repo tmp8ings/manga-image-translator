@@ -156,7 +156,7 @@
                 <i class="iconify w-8 h-8 text-gray-500" data-icon="carbon:cloud-upload"></i>
                 <div>Paste an image, click to select one or drag and drop here</div>
             </div>
-            <input id="file" type="file" accept="image/png,image/jpeg,image/bmp,image/webp,application/zip" class="hidden"
+            <input id="file" type="file" accept="image/png,image/jpeg,image/bmp,image/webp,application/zip,application/x-zip-compressed" class="hidden"
                    @change="onfilechange"/>
         </label>
         <div class="flex justify-center gap-2">
@@ -182,7 +182,7 @@
 </form>
 <script>
     const BASE_URI = '/'
-    const acceptTypes = ['image/png', 'image/jpeg', 'image/bmp', 'image/webp', 'application/zip']
+    const acceptTypes = ['image/png', 'image/jpeg', 'image/bmp', 'image/webp', 'application/zip', 'application/x-zip-compressed']
 
     function formatSize(bytes) {
         const k = 1024
