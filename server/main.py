@@ -384,15 +384,20 @@ async def zip_submit(
     job_id = str(uuid.uuid4())
     # Create a new Job object
     jobs[job_id] = Job(job_id)
+    logger.info(f"Job {job_id} created")
     
     # Prune expired jobs
     current_time = time.time()
     for job in list(jobs.keys()):
+        logger.debug(f"Checking job {job} for expiration")
         if jobs[job].is_expired():
             jobs[job].cleanup()  # Clean up any resources
             del jobs[job]
-            
+    
+    logger.info(f"Job {job_id} is being processed")
     asyncio.create_task(process_zip(job_id, req, image_bytes, config))
+    
+    logger.info(f"Job {job_id} submitted for processing")
     return JSONResponse(content={"job_id": job_id})
 
 
