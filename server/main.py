@@ -443,12 +443,20 @@ async def zip_download(job_id: str):
         raise HTTPException(404, detail="Job not found")
     if job["status"] != "finished":
         raise HTTPException(400, detail="Job not finished")
-    zip_io = io.BytesIO(job["result"])
-    # Return response similar to /translate/with-form/zip endpoint
-    return StreamingResponse(
-        stream_zip_with_heartbeat(zip_io),
-        media_type="application/zip"
+    
+    # Get the result bytes
+    zip_data = job["result"]
+    
+    # Create a Response with the binary data for direct download
+    from fastapi.responses import Response
+    filename = f"translated-{job_id[:8]}.zip"
+    
+    response = Response(
+        content=zip_data,
+        media_type="application/zip",
     )
+    response.headers["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return response
 
 
 # todo: restart if crash

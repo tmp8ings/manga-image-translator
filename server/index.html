@@ -128,18 +128,6 @@
                     <button type="submit" class="px-2 py-1 rounded-md text-blue-800 border-2 border-blue-300">Translate</button>
                     <div class="text-sm text-gray-600">Click the empty space or paste/drag a new one to replace</div>
                 </div>
-                <div v-else-if="file && isZip(file)" class="flex flex-col items-center gap-2">
-                    <div v-if="zipDownloadUrl">
-                        <button type="button" class="px-2 py-1 rounded-md text-blue-800 border-2 border-blue-300" @click="downloadZip">
-                            Download Zip
-                        </button>
-                    </div>
-                    <div v-else>
-                        <div><span class="iconify-inline inline-block mr-2 scale-125" data-icon="carbon:archive"></span>Zip file selected</div>
-                        <button type="submit" class="px-2 py-1 rounded-md text-blue-800 border-2 border-blue-300">Upload Zip</button>
-                        <div class="text-sm text-gray-600">Zip file will be processed and downloaded automatically</div>
-                    </div>
-                </div>
                 <div v-else class="flex flex-col items-center gap-2">
                     <i class="iconify w-8 h-8 text-gray-500" data-icon="carbon:cloud-upload"></i>
                     <div>Paste an image, click to select one or drag and drop here</div>
@@ -161,7 +149,7 @@
         <div v-if="downloads.length > 0" class="fixed bottom-4 right-4 p-4 bg-white rounded shadow-md">
             <h3 class="text-lg font-semibold mb-2">Download Translated Zips</h3>
             <div v-for="(item, index) in downloads" :key="index" class="mb-1 flex gap-2 items-center">
-                <button class="px-3 py-1 rounded-md border bg-blue-100 text-blue-800" @click="downloadZip(item.url)">
+                <button class="px-3 py-1 rounded-md border bg-blue-100 text-blue-800" @click="downloadZip(item.url, item.name)">
                     Download {{ item.name }}
                 </button>
                 <button class="px-2 py-1 text-red-700" @click="removeDownload(item, index)">
@@ -432,10 +420,10 @@
                 this.zipDownloadUrl = null  // reset zip download URL
                 this.status = null
             },
-            downloadZip(url) {
+            downloadZip(url, name) {
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = ''; // let browser decide or use URL label
+                a.download = name; // Specify the desired filename
                 a.click();
             },
             removeDownload(item, index) {
