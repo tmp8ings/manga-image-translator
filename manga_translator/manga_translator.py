@@ -509,7 +509,9 @@ class MangaTranslator:
 
         # -- OCR
         await self._report_progress("ocr")
+        logger.warning(f"Running OCR on detected text regions: {len(ctx.textlines)}")
         ctx.textlines = await self._run_ocr(config, ctx)
+        logger.warning(f"After Running OCR on detected text regions: {len(ctx.textlines)}")
 
         if not ctx.textlines:
             await self._report_progress("skip-no-text", True)
