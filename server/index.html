@@ -15,8 +15,8 @@
     </style>
 </head>
 <body>
-  <!-- New top message container for finishedMessage -->
-  <div class="fixed top-0 left-0 w-full p-4 bg-green-200 text-green-800 text-center z-50" v-if="finishedMessage">
+  <!-- Modified top message container to render only when finishedMessage is non-empty -->
+  <div class="fixed top-0 left-0 w-full p-4 bg-green-200 text-green-800 text-center z-50" v-if="finishedMessage.length > 0">
       {{ finishedMessage }}
   </div>
 <form
@@ -219,6 +219,10 @@
         return `${formatSize(loaded)}/${formatSize(total)}`
     }
 
+    function sleep(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
     PetiteVue.createApp({
         onmounted() {
             window.addEventListener('paste', this.onpaste)
@@ -390,7 +394,7 @@
                         this.status = "error";
                         break;
                     } else {
-                        await new Promise(resolve => setTimeout(resolve, 2000));
+                        await sleep(2000);
                     }
                 }
             };
@@ -444,7 +448,7 @@
                         }
                         buffer = buffer.slice(totalSize);
                     }
-                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    await sleep(1000);
                 }
             };
 
