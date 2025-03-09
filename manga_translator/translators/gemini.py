@@ -18,7 +18,7 @@ logger = logging.getLogger("manga_translator")
 
 class GeminiTranslator(ConfigGPT, CommonTranslator):
     _LANGUAGE_CODE_MAP = VALID_LANGUAGES
-    _MAX_REQUESTS_PER_MINUTE = 200
+    _MAX_REQUESTS_PER_MINUTE = 10
     _TIMEOUT = 40
     _RETRY_ATTEMPTS = 3
     _MAX_TOKENS = 8192
@@ -29,6 +29,16 @@ class GeminiTranslator(ConfigGPT, CommonTranslator):
         "gemini-2.0-flash-exp",
         "gemini-2.0-flash-thinking-exp-01-21",
     ]
+
+    def _set_configs_based_on_model_name(self, model_name):
+        if model_name == "gemini-2.0-pro-exp-02-05":
+            self._MAX_REQUESTS_PER_MINUTE = 2
+        elif model_name == "gemini-2.0-flash-exp":
+            self._MAX_REQUESTS_PER_MINUTE = 10
+        elif model_name == "gemini-2.0-flash-thinking-exp-01-21":
+            self._MAX_REQUESTS_PER_MINUTE = 10
+        else:
+            raise ValueError(f"Invalid model name: {model_name}")
 
     def round_robin_gemini_api_key(self, check_google_key):
         if not GOOGLE_API_KEY and check_google_key:
@@ -88,11 +98,9 @@ class GeminiTranslator(ConfigGPT, CommonTranslator):
         genai.configure(api_key=api_key)
         self.generation_config = self._configure_generation_config()
         self.safety_settings = self._configure_safety_settings()
-        model = genai.GenerativeModel(
-            model_name=model_name,
-            generation_config=self.generation_config,
-            safety_settings=self.safety_settings,
-        )
+
+        self._set_configs_based_on_model_name(model_name)
+
         if GOOGLE_HTTP_PROXY:
             # Configure proxy for requests
             import httpx
@@ -134,9 +142,7 @@ class GeminiTranslator(ConfigGPT, CommonTranslator):
                 if attempt == self._RETRY_ATTEMPTS - 1:
                     raise
                 await asyncio.sleep(1)
-        
 
-        
         return translations
 
     def _parse_response(self, response: str, queries: List[str]) -> List[str]:
@@ -220,3 +226,20 @@ class GeminiTranslator(ConfigGPT, CommonTranslator):
     @property
     def available_models(self):
         return self._AVAILABLE_MODELS
+
+
+class Gemini2FlashExp(GeminiTranslator):
+    def __init__(self):
+        super().__init__(model_name="gemini-2.0-flash-exp", check_google_key=True)
+
+
+class Gemini2ProExp(GeminiTranslator):
+    def __init__(self):
+        super().__init__(model_name="gemini-2.0-pro-exp-02-05", check_google_key=True)
+
+
+class Gemini2FlashThinkingExp(GeminiTranslator):
+    def __init__(self):
+        super().__init__(
+            model_name="gemini-2.0-flash-thinking-exp-01-21", check_google_key=True
+        )
