@@ -335,13 +335,6 @@
 
             formData.append('config', config)
 
-            // If ZIP file, create a download link from the user-initiated event.
-            if (this.isZip(this.file)) {
-                this.downloadLink = document.createElement('a');
-                this.downloadLink.style.display = 'none';
-                document.body.appendChild(this.downloadLink);
-            }
-
             const processChunk = (value) => {
                 if (this.error) return;
 
@@ -362,22 +355,9 @@
                     const data = buffer.slice(5, totalSize);
                     switch (statusCode) {
                         case 0:
-                            console.log(`status code is 0 ${this.isZip(this.file)}`)
-                            if (this.isZip(this.file)) {
-                                const zipBlob = new Blob([data], {type: this.file.type});
-                                const downloadUrl = URL.createObjectURL(zipBlob);
-                                console.log(`downloadUrl: ${downloadUrl}`)
-                                // Trigger download via the pre-created anchor
-                                this.downloadLink.href = downloadUrl;
-                                this.downloadLink.download = 'download.zip';
-                                this.downloadLink.click();
-                                // Cleanup and clear state
-                                this.downloadLink.remove();
-                                this.clear();
-                            } else {
-                                this.result = new Blob([data], {type: 'image/png'});
-                                this.status = null;
-                            }
+                            console.log("status code is 0");
+                            this.result = new Blob([data], {type: 'image/png'});
+                            this.status = null;
                             break;
                         case 1:
                             this.status = decoder.decode(data);
@@ -398,33 +378,44 @@
                     buffer = buffer.slice(totalSize);
                 }
             }
+
             const uploadWithProgress = async (formData) => {
                 try {
-                    // change url based on zip or not
-                    const url = this.isZip(this.file) ? `${BASE_URI}translate/with-form/zip` : `${BASE_URI}translate/with-form/image/stream`;
+                    const url = this.isZip(this.file)
+                        ? `${BASE_URI}translate/with-form/zip`
+                        : `${BASE_URI}translate/with-form/image/stream`;
                     const response = await fetch(url, {
                         method: 'POST',
                         body: formData,
                     });
-
                     if (response.status !== 200) {
                         this.status = 'error-upload';
                         this.status = 'pending';
                         return;
                     }
-
-                    const reader = response.body.getReader();
-                    while (true) {
-                        const { done, value } = await reader.read();
-                        if (done) break;
-                        processChunk(value);
+                    if (this.isZip(this.file)) {
+                        // ZIP 파일은 스트림 대신 Blob 전체로 받아 다운로드 처리
+                        const blob = await response.blob();
+                        const downloadUrl = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = downloadUrl;
+                        a.download = 'download.zip';
+                        a.click();
+                        a.remove();
+                        this.clear();
+                    } else {
+                        const reader = response.body.getReader();
+                        while (true) {
+                            const { done, value } = await reader.read();
+                            if (done) break;
+                            processChunk(value);
+                        }
                     }
                 } catch (error) {
                     console.error(error);
                     this.status = 'error-disconnect';
                 }
             }
-
             uploadWithProgress(formData);
         },
         clear() {
