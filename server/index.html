@@ -28,9 +28,6 @@
       un-cloak
     >
       <div class="flex flex-col w-85ch h-full justify-center gap-2">
-        <h1 class="text-center text-lg font-light mb-4">
-          Image/Manga Translator
-        </h1>
         <!-- Basic Settings -->
         <div class="flex flex-wrap mx-4 justify-start items-end gap-4 mb-4">
           <div
@@ -395,12 +392,6 @@
               >File Preview
             </div>
             <img class="max-w-72 max-h-72" :src="fileUri" />
-            <button
-              type="submit"
-              class="px-2 py-1 rounded-md text-blue-800 border-2 border-blue-300"
-            >
-              Translate
-            </button>
             <div class="text-sm text-gray-600">
               Click the empty space or paste/drag a new one to replace
             </div>
@@ -414,16 +405,12 @@
                 class="iconify-inline inline-block mr-2 scale-125"
                 data-icon="carbon:archive"
               ></span>
-              Zip file selected
+              Uploaded Zip: {{ file.name }} at
+              {{ new Date(file.lastModified).toLocaleString() }}
             </div>
-            <button
-              type="submit"
-              class="px-2 py-1 rounded-md text-blue-800 border-2 border-blue-300"
-            >
-              Upload Zip
-            </button>
             <div class="text-sm text-gray-600">
-              Zip file will be processed and downloaded automatically
+              Zip file will be processed and downloaded automatically after
+              clicking Translate.
             </div>
           </div>
           <div v-else class="flex flex-col items-center gap-2">
@@ -441,6 +428,15 @@
             @change="onfilechange"
           />
         </label>
+        <!-- New global Translate button placed outside file input label to avoid accidental clicks -->
+        <div v-if="file" class="flex justify-center mt-4">
+          <button
+            type="submit"
+            class="px-4 py-2 border rounded text-sm text-blue-800 border-blue-300"
+          >
+            Translate
+          </button>
+        </div>
         <div class="flex justify-center gap-2">
           <a
             class="underline underline-blue-400"
