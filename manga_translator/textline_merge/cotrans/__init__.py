@@ -5,7 +5,7 @@ import unicodedata
 
 import cv2
 from manga_translator.config import Config
-from utils import Quadrilateral, quadrilateral_can_merge_region_coarse
+from manga_translator.utils import Quadrilateral, quadrilateral_can_merge_region_coarse
 import numpy as np
 import networkx as nx
 
