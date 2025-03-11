@@ -28,12 +28,12 @@
       un-cloak
     >
       <div class="flex flex-col w-85ch h-full justify-center gap-2">
-        <h1 class="text-center text-lg font-light">Image/Manga Translator</h1>
+        <h1 class="text-center text-lg font-light mb-4">Image/Manga Translator</h1>
         <!-- Basic Settings -->
-        <div class="flex mx-4 justify-start items-end gap-4">
+        <div class="flex flex-wrap mx-4 justify-start items-end gap-4 mb-4">
           <div class="flex items-center" title="Detection Resolution">
             <i class="iconify" data-icon="carbon:fit-to-screen"></i>
-            <span class="ml-1 text-sm">Detection</span>
+            <span class="ml-1 mr-2 text-sm">Detection</span>
             <div class="relative">
               <select
                 class="w-9ch appearance-none bg-transparent border-b border-gray-300"
@@ -53,7 +53,7 @@
           </div>
           <div class="flex items-center" title="Text Detector">
             <i class="iconify" data-icon="carbon:search-locate"></i>
-            <span class="ml-1 text-sm">Detector</span>
+            <span class="ml-1 mr-2 text-sm">Detector</span>
             <div class="relative">
               <select
                 class="w-9ch appearance-none bg-transparent border-b border-gray-300"
@@ -72,7 +72,7 @@
           </div>
           <div class="flex items-center" title="Text Orientation">
             <i class="iconify" data-icon="carbon:text-align-left"></i>
-            <span class="ml-1 text-sm">Orientation</span>
+            <span class="ml-1 mr-2 text-sm">Orientation</span>
             <div class="relative">
               <select
                 class="w-12ch appearance-none bg-transparent border-b border-gray-300"
@@ -90,7 +90,7 @@
           </div>
           <div class="flex items-center" title="Translator">
             <i class="iconify" data-icon="carbon:operations-record"></i>
-            <span class="ml-1 text-sm">Translator</span>
+            <span class="ml-1 mr-2 text-sm">Translator</span>
             <div class="relative">
               <select
                 class="w-9ch appearance-none bg-transparent border-b border-gray-300"
@@ -108,7 +108,7 @@
           </div>
           <div class="flex items-center" title="Target Language">
             <i class="iconify" data-icon="carbon:language"></i>
-            <span class="ml-1 text-sm">Language</span>
+            <span class="ml-1 mr-2 text-sm">Language</span>
             <div class="relative">
               <select
                 class="w-15ch appearance-none bg-transparent border-b border-gray-300"
@@ -143,7 +143,7 @@
           <!-- Moved OCR Model into basic settings -->
           <div class="flex items-center" title="OCR Model">
             <i class="iconify" data-icon="carbon:text-recognition"></i>
-            <span class="ml-1 text-sm">OCR</span>
+            <span class="ml-1 mr-2 text-sm">OCR</span>
             <div class="relative">
               <select
                 class="w-12ch appearance-none bg-transparent border-b border-gray-300"
@@ -163,23 +163,22 @@
         </div>
 
         <!-- Toggle Advanced Settings Button -->
-        <div class="flex mx-4 my-2">
+        <div class="flex mx-4 my-4">
           <button
             type="button"
-            class="px-3 py-1 border rounded text-sm"
+            class="px-4 py-2 border rounded text-sm"
             @click="advancedVisible = !advancedVisible"
           >
-            {{ advancedVisible ? 'Hide Advanced Settings' : 'Show Advanced
-            Settings' }}
+            {{ advancedVisible ? 'Hide Advanced Settings ▲' : 'Show Advanced Settings ▼' }}
           </button>
         </div>
 
         <!-- Advanced Settings -->
-        <div v-if="advancedVisible">
-          <div class="flex mx-4 justify-start items-end gap-4">
+        <div v-if="advancedVisible" class="mb-4">
+          <div class="flex flex-wrap mx-4 justify-start items-end gap-4 mb-4">
             <div class="flex items-center" title="Inpainting Size">
               <i class="iconify" data-icon="carbon:paint-brush"></i>
-              <span class="ml-1 text-sm">Inpainting</span>
+              <span class="ml-1 mr-2 text-sm">Inpainting</span>
               <div class="relative">
                 <select
                   class="w-9ch appearance-none bg-transparent border-b border-gray-300"
@@ -198,7 +197,7 @@
             </div>
             <div class="flex items-center" title="Unclip Ratio">
               <i class="iconify" data-icon="weui:max-window-filled"></i>
-              <span class="ml-1 text-sm">Unclip Ratio</span>
+              <span class="ml-1 mr-2 text-sm">Unclip Ratio</span>
               <div class="relative">
                 <input
                   type="number"
@@ -212,7 +211,7 @@
             </div>
             <div class="flex items-center" title="Box Threshold">
               <i class="iconify" data-icon="weui:photo-wall-outlined"></i>
-              <span class="ml-1 text-sm">Box Threshold</span>
+              <span class="ml-1 mr-2 text-sm">Box Threshold</span>
               <div class="relative">
                 <input
                   type="number"
@@ -226,7 +225,7 @@
             </div>
             <div class="flex items-center" title="Text Threshold">
               <i class="iconify" data-icon="carbon:threshold"></i>
-              <span class="ml-1 text-sm">Text Threshold</span>
+              <span class="ml-1 mr-2 text-sm">Text Threshold</span>
               <div class="relative">
                 <input
                   type="number"
@@ -243,7 +242,7 @@
                 class="iconify"
                 data-icon="material-symbols:adjust-outline"
               ></i>
-              <span class="ml-1 text-sm">Mask Offset</span>
+              <span class="ml-1 mr-2 text-sm">Mask Offset</span>
               <div class="relative">
                 <input
                   type="number"
@@ -257,7 +256,7 @@
             </div>
             <div class="flex items-center" title="Inpainter">
               <i class="iconify" data-icon="carbon:paint-brush"></i>
-              <span class="ml-1 text-sm">Inpainter</span>
+              <span class="ml-1 mr-2 text-sm">Inpainter</span>
               <div class="relative">
                 <select
                   class="w-12ch appearance-none bg-transparent border-b border-gray-300"
@@ -277,20 +276,20 @@
               </div>
             </div>
           </div>
-          <div class="flex mx-4 justify-start items-center gap-4 mt-2">
+          <div class="flex flex-wrap mx-4 justify-start items-center gap-4 mt-4">
             <div
               class="flex items-center"
               title="Invert image colors for detection"
             >
               <input type="checkbox" v-model="detInvert" />
-              <label class="ml-1 text-sm">Invert Colors</label>
+              <label class="ml-1 mr-2 text-sm">Invert Colors</label>
             </div>
             <div
               class="flex items-center"
               title="Apply gamma correction for detection"
             >
               <input type="checkbox" v-model="detGammaCorrect" />
-              <label class="ml-1 text-sm">Gamma Correction</label>
+              <label class="ml-1 mr-2 text-sm">Gamma Correction</label>
             </div>
             <!-- Removed OCR Model from here -->
           </div>
