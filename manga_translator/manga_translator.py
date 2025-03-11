@@ -764,12 +764,12 @@ class MangaTranslator:
         self._model_usage_timestamps[("textline_merge", "textline_merge")] = (
             current_time
         )
-        text_regions = await dispatch_textline_merge(
-            ctx.textlines,
-            ctx.img_rgb.shape[1],
-            ctx.img_rgb.shape[0],
-            verbose=self.verbose,
-        )
+        # text_regions = await dispatch_textline_merge(
+        #     ctx.textlines,
+        #     ctx.img_rgb.shape[1],
+        #     ctx.img_rgb.shape[0],
+        #     verbose=self.verbose,
+        # )
         text_regions = await run_merge(
             ctx.textlines,
             ctx.img_rgb.shape[1],
