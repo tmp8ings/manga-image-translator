@@ -459,39 +459,6 @@
             >Source Code</a
           >
         </div>
-        <!-- Finished message section -->
-        <div
-          v-if="finishedMessage"
-          class="fixed top-4 left-1/2 transform -translate-x-1/2 bg-green-200 text-green-800 px-4 py-2 rounded shadow-md"
-        >
-          <span v-text="finishedMessage"></span>
-        </div>
-        <!-- Download list section -->
-        <div
-          v-if="downloads.length > 0"
-          class="fixed bottom-4 right-4 p-4 bg-white rounded shadow-md"
-        >
-          <h3 class="text-lg font-semibold mb-2">Download Translated Zips</h3>
-          <div
-            v-for="(item, index) in downloads"
-            :key="index"
-            class="mb-1 flex gap-2 items-center"
-          >
-            <button
-              @click.stop.prevent="programmaticDownload(item)"
-              class="px-3 py-1 rounded-md border bg-blue-100 text-blue-800"
-            >
-              <span>Download {{item.name}}</span>
-            </button>
-            <button
-              type="button"
-              class="px-2 py-1 text-red-700"
-              @click.stop.prevent="removeDownload(item, index)"
-            >
-              Delete
-            </button>
-          </div>
-        </div>
       </div>
     </form>
     <script>
@@ -527,8 +494,6 @@
 
         // New data properties for ZIP support and downloads list
         file: null,
-        downloads: [],
-        finishedMessage: "",
         zipDownloadUrl: null,
         get fileUri() {
           return this.file ? URL.createObjectURL(this.file) : null;
@@ -792,21 +757,15 @@
             const origName = this.file.name || "download.zip";
             const translatedName =
               origName.replace(/\.zip$/i, "") + "-translated.zip";
-            // Updated: add cache buster to avoid cached/incomplete zip file
             const downloadItem = {
               job_id: job_id,
               name: translatedName,
-              url: `${BASE_URI}translate/with-form/zip-download/${job_id}?t=${Date.now()}`,
-              originalName: translatedName,
+              url: `${BASE_URI}translate/with-form/zip-download/${job_id}?t=${Date.now()}`
             };
-            this.downloads.push(downloadItem);
             // Start download automatically
             this.programmaticDownload(downloadItem);
             this.status = null;
             this.file = null;
-            this.finishedMessage = "Translation completed successfully!";
-            await sleep(5000);
-            this.finishedMessage = "";
           } else {
             this.status = status;
           }
@@ -882,21 +841,6 @@
           document.body.appendChild(a);
           a.click();
           document.body.removeChild(a);
-        },
-        async removeDownload(item, index) {
-          try {
-            const resp = await fetch(
-              `${BASE_URI}translate/with-form/zip-delete/${item.job_id}`,
-              {
-                method: "DELETE",
-              }
-            );
-            if (resp.ok) {
-              this.downloads.splice(index, 1);
-            }
-          } catch (err) {
-            console.error(err);
-          }
         },
         // 새로운 프로그래매틱 다운로드 핸들러 추가
         async programmaticDownload(item) {
