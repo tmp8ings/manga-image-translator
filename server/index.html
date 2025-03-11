@@ -181,11 +181,20 @@
             </div>
           </div>
           <!-- New basic setting for expand_box_width_ratio -->
-          <div class="flex items-center" title="세로 쓰기를 가로 쓰기로 전환 시, 좌우 너비를 조정하는 비율">
+          <div
+            class="flex items-center"
+            title="세로 쓰기를 가로 쓰기로 전환 시, 좌우 너비를 조정하는 비율"
+          >
             <i class="iconify" data-icon="carbon:resize-horizontal"></i>
             <span class="ml-1 mr-2 text-sm">가로 너비 확장</span>
             <div class="relative">
-              <input type="number" step="0.1" class="w-9ch appearance-none bg-transparent border-b border-gray-300" v-model="expandBoxWidthRatio" placeholder="2.0" />
+              <input
+                type="number"
+                step="0.1"
+                class="w-9ch appearance-none bg-transparent border-b border-gray-300"
+                v-model="expandBoxWidthRatio"
+                placeholder="2.0"
+              />
             </div>
           </div>
         </div>
@@ -232,10 +241,7 @@
               title="텍스트 뼈대를 기반으로 글자 영역을 결정할 때, 글자 대비 박스의 크기를 얼마만큼 확장할지를 결정하는 비율"
             >
               <i class="iconify" data-icon="weui:max-window-filled"></i>
-              <span
-                class="ml-1 mr-2 text-sm"
-                >Unclip Ratio</span
-              >
+              <span class="ml-1 mr-2 text-sm">Unclip Ratio</span>
               <div class="relative">
                 <input
                   type="number"
@@ -328,7 +334,10 @@
               <label class="ml-1 mr-2 text-sm">OCR 시 감마 보정</label>
             </div>
             <!-- New advanced setting for exclude_onomatopoeia -->
-            <div class="flex items-center" title="배경의 효과음으로 추정되는 텍스트는 번역에서 제외">
+            <div
+              class="flex items-center"
+              title="배경의 효과음으로 추정되는 텍스트는 번역에서 제외"
+            >
               <input type="checkbox" v-model="excludeOnomatopoeia" />
               <label class="ml-1 mr-2 text-sm">효과음 제외</label>
             </div>
@@ -716,13 +725,33 @@
             this.status = "error-disconnect";
           }
         },
+        // New helper method for polling with timeout and retry logic
+        async _pollJobStatus(job_id, attempt = 0) {
+          const MAX_ATTEMPTS = 3;
+          const url = `${BASE_URI}translate/with-form/zip-status/${job_id}`;
+          try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000);
+            const response = await fetch(url, { signal: controller.signal });
+            clearTimeout(timeoutId);
+            if (!response.ok) {
+              throw new Error("Network response not ok.");
+            }
+            return await response.json();
+          } catch (err) {
+            if (attempt < MAX_ATTEMPTS) {
+              console.warn(`Fetch attempt ${attempt + 1} failed: ${err}. Retrying...`);
+              await sleep(2000);
+              return this._pollJobStatus(job_id, attempt + 1);
+            }
+            throw err;
+          }
+        },
+
         async pollJobStatus(job_id) {
           try {
             while (true) {
-              const resp = await fetch(
-                `${BASE_URI}translate/with-form/zip-status/${job_id}`
-              );
-              const statusJson = await resp.json();
+              const statusJson = await this._pollJobStatus(job_id);
               console.log("Polling job:", job_id, "status:", statusJson.status);
               const currStatus = statusJson.status.trim();
               if (currStatus === "finished") {
@@ -760,7 +789,7 @@
             const downloadItem = {
               job_id: job_id,
               name: translatedName,
-              url: `${BASE_URI}translate/with-form/zip-download/${job_id}?t=${Date.now()}`
+              url: `${BASE_URI}translate/with-form/zip-download/${job_id}?t=${Date.now()}`,
             };
             // Start download automatically
             this.programmaticDownload(downloadItem);
@@ -846,7 +875,9 @@
         async _programmaticDownload(item) {
           try {
             this.status = "downloading";
-            const url = `${item.url}&filename=${encodeURIComponent(item.name)}&t=${Date.now()}`;
+            const url = `${item.url}&filename=${encodeURIComponent(
+              item.name
+            )}&t=${Date.now()}`;
 
             // Fetch API로 파일 다운로드
             const response = await fetch(url);
@@ -880,7 +911,7 @@
           }
         },
         async programmaticDownload(item) {
-          for(let i = 0; i < 3; i++) {
+          for (let i = 0; i < 3; i++) {
             const success = await this._programmaticDownload(item);
             if (success) break;
             await sleep(2000); // 2초 후 재시도
