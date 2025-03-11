@@ -283,5 +283,5 @@ def run_merge(
             region.assigned_direction = majority_dir
             text_regions.append(region)
             for textline_idx in textline_indices:
-                region.lines.append(textlines[textline_idx])
+                region.textlines.append(textlines[textline_idx])
     return text_regions, "textline-merge-20220423"
