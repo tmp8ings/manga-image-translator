@@ -218,9 +218,9 @@
                 ></i>
               </div>
             </div>
-            <div class="flex items-center" title="Unclip Ratio">
+            <div class="flex items-center" title="텍스트 골격을 확장하여 텍스트 영역을 결정하는 비율. 너무 크게 지정하면 불필요한 배경까지 포함될 수 있습니다.">
               <i class="iconify" data-icon="weui:max-window-filled"></i>
-              <span class="ml-1 mr-2 text-sm">Unclip Ratio</span>
+              <span class="ml-1 mr-2 text-sm" title="텍스트 골격을 확장하여 텍스트 영역을 결정하는 비율.">Unclip Ratio</span>
               <div class="relative">
                 <input
                   type="number"
@@ -229,12 +229,13 @@
                   placeholder="5.0 (Default)"
                   step="0.01"
                   value="5.0"
+                  title="텍스트 골격을 확장하여 텍스트 영역을 결정하는 비율."
                 />
               </div>
             </div>
-            <div class="flex items-center" title="Box Threshold">
+            <div class="flex items-center" title="텍스트 영역 감지 시 박스 생성의 임계값. 값이 낮으면 작은 영역만 인식됩니다.">
               <i class="iconify" data-icon="weui:photo-wall-outlined"></i>
-              <span class="ml-1 mr-2 text-sm">Box Threshold</span>
+              <span class="ml-1 mr-2 text-sm" title="텍스트 영역 감지 시 박스 생성의 임계값.">Box Threshold</span>
               <div class="relative">
                 <input
                   type="number"
@@ -243,12 +244,13 @@
                   placeholder="0.7 (Default)"
                   step="0.01"
                   value="0.7"
+                  title="텍스트 영역 감지 시 박스 생성의 임계값."
                 />
               </div>
             </div>
-            <div class="flex items-center" title="Text Threshold">
+            <div class="flex items-center" title="텍스트 인식 임계값. 정확한 인식을 위해 적절한 값을 사용하세요.">
               <i class="iconify" data-icon="carbon:threshold"></i>
-              <span class="ml-1 mr-2 text-sm">Text Threshold</span>
+              <span class="ml-1 mr-2 text-sm" title="텍스트 인식 임계값.">Text Threshold</span>
               <div class="relative">
                 <input
                   type="number"
@@ -257,15 +259,13 @@
                   placeholder="0.5 (Default)"
                   step="0.01"
                   value="0.5"
+                  title="텍스트 인식 임계값."
                 />
               </div>
             </div>
-            <div class="flex items-center" title="Mask Dilation Offset">
-              <i
-                class="iconify"
-                data-icon="material-symbols:adjust-outline"
-              ></i>
-              <span class="ml-1 mr-2 text-sm">Mask Offset</span>
+            <div class="flex items-center" title="텍스트 제거 후 잔여 자국을 없애기 위해 텍스트 영역을 확장할 픽셀 수를 지정합니다. (일반적으로 30이 권장됩니다.)">
+              <i class="iconify" data-icon="material-symbols:adjust-outline"></i>
+              <span class="ml-1 mr-2 text-sm" title="텍스트 제거 후 잔여 자국을 없애기 위한 픽셀 수.">Mask Offset</span>
               <div class="relative">
                 <input
                   type="number"
@@ -274,31 +274,8 @@
                   placeholder="30 (Default)"
                   step="1"
                   value="30"
+                  title="텍스트 제거 후 잔여 자국을 없애기 위한 픽셀 수."
                 />
-              </div>
-            </div>
-            <div
-              class="flex items-center"
-              title="inpainting(감지된 글자 제거)에 사용할 모델을 선택합니다."
-            >
-              <i class="iconify" data-icon="carbon:paint-brush"></i>
-              <span class="ml-1 mr-2 text-sm">Inpainter</span>
-              <div class="relative">
-                <select
-                  class="w-auto pr-8 appearance-none bg-transparent border-b border-gray-300"
-                  v-model="inpainter"
-                >
-                  <option value="default">Default</option>
-                  <option value="lama_large">Lama Large</option>
-                  <option value="lama_mpe">Lama MPE</option>
-                  <option value="sd">SD</option>
-                  <option value="none">None</option>
-                  <option value="original">Original</option>
-                </select>
-                <i
-                  class="iconify absolute top-1.5 right-1 pointer-events-none"
-                  data-icon="carbon:chevron-down"
-                ></i>
               </div>
             </div>
           </div>
@@ -307,14 +284,14 @@
           >
             <div
               class="flex items-center"
-              title="Invert image colors for detection"
+              title="인식률 향상을 위해 이미지의 색상을 반전시킵니다."
             >
               <input type="checkbox" v-model="detInvert" />
               <label class="ml-1 mr-2 text-sm">Invert Colors</label>
             </div>
             <div
               class="flex items-center"
-              title="Apply gamma correction for detection"
+              title="인식률 향상을 위해 감마 보정을 적용합니다."
             >
               <input type="checkbox" v-model="detGammaCorrect" />
               <label class="ml-1 mr-2 text-sm">Gamma Correction</label>
