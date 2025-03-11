@@ -171,9 +171,9 @@
                   type="number"
                   class="w-9ch appearance-none bg-transparent border-b border-gray-300"
                   v-model="customUnclipRatio"
-                  placeholder="2.3 (Default)"
+                  placeholder="5.0 (Default)"
                   step="0.01"
-                  value="2.3"
+                  value="5.0"
                 />
               </div>
             </div>
@@ -508,7 +508,7 @@
         detInvert: false,
         detGammaCorrect: false,
         // Add OCR model option
-        ocrModel: "mocr",
+        ocrModel: "48px_ctc",
 
         ondrop(e) {
           const file = e.dataTransfer?.files?.[0];
