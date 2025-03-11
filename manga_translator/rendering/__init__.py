@@ -177,10 +177,7 @@ def expand_text_boxes(
 
     for region in all_regions:
         bbox = region.xyxy  # [x1, y1, x2, y2]
-        # Expand only if the region is in to_be_expanded_change_regions and passes is_expand_needed.
-        if (region not in to_be_expanded_change_regions) or (
-            not is_expand_needed(region, img)
-        ):
+        if (region not in to_be_expanded_change_regions) or (not is_expand_needed(region, img)):
             placed_boxes.append(tuple(bbox.tolist()))
             expanded_regions.append(region)
             continue
@@ -205,29 +202,29 @@ def expand_text_boxes(
             new_y2 = center_y + new_height // 2
             new_x1, new_x2 = x1, x2
 
-        # Clip within image boundaries
+        # Clip within image boundaries.
         new_x1 = max(0, new_x1)
         new_y1 = max(0, new_y1)
         new_x2 = min(img.shape[1], new_x2)
         new_y2 = min(img.shape[0], new_y2)
         proposed_box = (new_x1, new_y1, new_x2, new_y2)
 
-        # If overlapping with any already placed box, shift (right for horizontal, down for vertical)
-        shift = 0
-        max_shift = 100
-        while (
-            any(boxes_overlap(proposed_box, placed) for placed in placed_boxes)
-            and shift < max_shift
-        ):
-            shift += 5
+        # Reposition using overlapping box info until no overlap exists.
+        while any(boxes_overlap(proposed_box, placed) for placed in placed_boxes):
             if region.horizontal:
-                new_x1_shift = min(new_x1 + shift, img.shape[1] - new_width)
-                new_x2_shift = new_x1_shift + new_width
-                proposed_box = (new_x1_shift, new_y1, new_x2_shift, new_y2)
+                overlapping_boxes = [b for b in placed_boxes if boxes_overlap(proposed_box, b)]
+                new_x1 = max(b[2] for b in overlapping_boxes) + 5
+                new_x2 = new_x1 + new_width
+                new_x1 = max(0, new_x1)
+                new_x2 = min(img.shape[1], new_x2)
+                proposed_box = (new_x1, new_y1, new_x2, new_y2)
             else:
-                new_y1_shift = min(new_y1 + shift, img.shape[0] - new_height)
-                new_y2_shift = new_y1_shift + new_height
-                proposed_box = (new_x1, new_y1_shift, new_x2, new_y2_shift)
+                overlapping_boxes = [b for b in placed_boxes if boxes_overlap(proposed_box, b)]
+                new_y1 = max(b[3] for b in overlapping_boxes) + 5
+                new_y2 = new_y1 + new_height
+                new_y1 = max(0, new_y1)
+                new_y2 = min(img.shape[0], new_y2)
+                proposed_box = (new_x1, new_y1, new_x2, new_y2)
 
         placed_boxes.append(proposed_box)
         # Update region.lines with the new rectangular coordinates
