@@ -803,18 +803,18 @@ class MangaTranslator:
                 filtered_textlines.append(txtln)
             ctx.textlines = filtered_textlines
 
-        # text_regions = await dispatch_textline_merge(
-        #     ctx.textlines,
-        #     ctx.img_rgb.shape[1],
-        #     ctx.img_rgb.shape[0],
-        #     verbose=self.verbose,
-        # )
-        text_regions = await run_merge(
+        text_regions = await dispatch_textline_merge(
             ctx.textlines,
             ctx.img_rgb.shape[1],
             ctx.img_rgb.shape[0],
             verbose=self.verbose,
         )
+        # text_regions = await run_merge(
+        #     ctx.textlines,
+        #     ctx.img_rgb.shape[1],
+        #     ctx.img_rgb.shape[0],
+        #     verbose=self.verbose,
+        # )
 
         new_text_regions = []
         for region in text_regions:
