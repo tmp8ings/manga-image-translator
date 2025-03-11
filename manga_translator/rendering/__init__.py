@@ -131,7 +131,7 @@ def is_in_speech_balloon(region: TextBlock, img: np.ndarray) -> bool:
 def is_expand_needed(region: TextBlock, img: np.ndarray) -> bool:
     # log every elements that can effect the decision
     # logger.debug(f"region {region.translation[:3]}({len(region.translation[:3])}): font size: {region.font_size}, unrotated_size: {region.unrotated_size}")
-    
+
     # Do not expand if region is vertical.
     if region.vertical:
         # logger.debug(f"region {region.translation[:3]} is vertical")
@@ -149,7 +149,7 @@ def is_expand_needed(region: TextBlock, img: np.ndarray) -> bool:
     if is_in_speech_balloon(region, img):
         # logger.debug(f"region {region.translation[:3]} is in a speech balloon")
         return False
-    
+
     # 텍스트 박스의 모양이 세로로 긴 형태일 때 True 리턴
     if region.unrotated_size[1] > region.unrotated_size[0] * 2:
         # logger.debug(f"region {region.translation[:3]} is long")
@@ -159,15 +159,13 @@ def is_expand_needed(region: TextBlock, img: np.ndarray) -> bool:
 
 
 def expand_text_boxes(
-    regions: List[TextBlock], expand_box_width_ratio: float, img: np.ndarray
+    to_be_expanded_change_regions: List[TextBlock],
+    all_regions: List[TextBlock],
+    expand_box_width_ratio: float,
+    img: np.ndarray,
 ):
-    """
-    Expand text boxes that need expansion (as per is_expand_needed) by scaling their width (for horizontal text)
-    or height (for vertical text) by expand_box_width_ratio. Adjust positions to avoid overlapping and ensure
-    boxes remain within the image boundaries.
-    """
     if expand_box_width_ratio <= 0 or math.isclose(expand_box_width_ratio, 1.0):
-        return regions  # No change needed
+        return all_regions  # No change needed
 
     def boxes_overlap(box1, box2):
         x1, y1, x2, y2 = box1
@@ -177,13 +175,17 @@ def expand_text_boxes(
     expanded_regions = []
     placed_boxes = []  # Store already placed (x1, y1, x2, y2) boxes
 
-    for region in regions:
+    for region in all_regions:
         bbox = region.xyxy  # [x1, y1, x2, y2]
-        if not is_expand_needed(region, img):
+        # Expand only if the region is in to_be_expanded_change_regions and passes is_expand_needed.
+        if (region not in to_be_expanded_change_regions) or (
+            not is_expand_needed(region, img)
+        ):
             placed_boxes.append(tuple(bbox.tolist()))
             expanded_regions.append(region)
             continue
 
+        # Process expansion for regions that need expansion.
         x1, y1, x2, y2 = bbox
         width = x2 - x1
         height = y2 - y1
@@ -260,11 +262,11 @@ async def dispatch(
 
     text_render.set_font(font_path)
     text_regions = list(filter(lambda region: region.translation.strip(), text_regions))
-    
+
     # logger.debug(f"before expand: {text_regions}")
-    text_regions = expand_text_boxes(
-        text_regions, config.render.expand_box_width_ratio, img
-    )
+    # text_regions = expand_text_boxes(
+    #     text_regions, config.render.expand_box_width_ratio, img
+    # )
     # logger.debug(f"after expand: {text_regions}")
 
     log_text = "\n".join([str(i) for i in text_regions])

@@ -58,7 +58,11 @@ from .colorization import (
     prepare as prepare_colorization,
     unload as unload_colorization,
 )
-from .rendering import dispatch as dispatch_rendering, dispatch_eng_render
+from .rendering import (
+    dispatch as dispatch_rendering,
+    dispatch_eng_render,
+    expand_text_boxes,
+)
 
 # Will be overwritten by __main__.py if module is being run directly (with python -m)
 logger = logging.getLogger("manga_translator")
@@ -188,7 +192,7 @@ class MangaTranslator:
     @property
     def using_gpu(self):
         return self.device.startswith("cuda") or self.device == "mps"
-    
+
     async def prepare_translation(self, config: Config):
         # preload and download models (not strictly necessary, remove to lazy load)
         if self.models_ttl == 0:
@@ -205,7 +209,7 @@ class MangaTranslator:
             except Exception as e:
                 logger.error(f"Error while loading models: {str(e)}", exc_info=True)
                 raise e
-    
+
     async def batch_translate(self, zipped_image, config: Config) -> Context:
         """
         Translates a zip file containing images from a manga. Returns dict with result and intermediates of translation.
@@ -229,7 +233,7 @@ class MangaTranslator:
         except Exception as e:
             logger.error(f"Error during _translate: {str(e)}", exc_info=True)
             raise e
-    
+
     async def _unzip_image(self, zipped_image: bytes) -> List[Image.Image]:
         """
         Unzips the provided zip file and returns a list of PIL images.
@@ -242,7 +246,7 @@ class MangaTranslator:
                         image = Image.open(file)
                         images.append(image.convert("RGBA"))
         return images
-    
+
     async def _zip_images(self, images: List[Image.Image]) -> bytes:
         """
         Zips the provided list of PIL images and returns the zip file as bytes.
@@ -256,11 +260,11 @@ class MangaTranslator:
                 zip_ref.writestr(f"image_{i}.png", img_buffer.read())
         zip_buffer.seek(0)
         return zip_buffer.getvalue()
-    
+
     async def _batch_translate(self, config: Config, ctx: Context) -> Context:
         zipped_image = ctx.zipped_image
         images = await self._unzip_image(zipped_image)
-        
+
         if self._detector_cleanup_task is None:
             self._detector_cleanup_task = asyncio.create_task(
                 self._detector_cleanup_job()
@@ -285,7 +289,9 @@ class MangaTranslator:
             local_ctx.img_rgb, local_ctx.img_alpha = load_image(local_ctx.upscaled)
             # -- Detection
             # await self._report_progress("detection")
-            local_ctx.textlines, local_ctx.mask_raw, local_ctx.mask = await self._run_detection(config, local_ctx)
+            local_ctx.textlines, local_ctx.mask_raw, local_ctx.mask = (
+                await self._run_detection(config, local_ctx)
+            )
             if self.verbose:
                 cv2.imwrite(self._result_path("mask_raw.png"), local_ctx.mask_raw)
             if not local_ctx.textlines:
@@ -321,11 +327,12 @@ class MangaTranslator:
             local_ctx.text_regions = await self._run_textline_merge(config, local_ctx)
             if self.verbose:
                 bboxes = visualize_textblocks(
-                    cv2.cvtColor(local_ctx.img_rgb, cv2.COLOR_BGR2RGB), local_ctx.text_regions
+                    cv2.cvtColor(local_ctx.img_rgb, cv2.COLOR_BGR2RGB),
+                    local_ctx.text_regions,
                 )
                 cv2.imwrite(self._result_path("bboxes.png"), bboxes)
             contexts.append(local_ctx)
-        
+
         # Gather all texts from all contexts for batch translation.
         batch_texts = []
         indices = []  # record number of text regions per context.
@@ -334,21 +341,23 @@ class MangaTranslator:
             indices.append(count)
             for region in local_ctx.text_regions or []:
                 batch_texts.append(region.text)
-        
+
         if not batch_texts:
             return contexts[-1] if contexts else ctx
-        
+
         # New translation block using self._run_text_translation on combined text regions
         combined_ctx = Context()
         combined_ctx.text_regions = []
         for local_ctx in contexts:
             if local_ctx.text_regions:
                 combined_ctx.text_regions.extend(local_ctx.text_regions)
-        
+
         await self._report_progress("translating")
         try:
             # Batch translation based on cumulative text length
-            max_batch = getattr(config.translator, "batch_limit", 1000)  # default max characters per batch
+            max_batch = getattr(
+                config.translator, "batch_limit", 1000
+            )  # default max characters per batch
             batched_results = []
             current_batch = []
             current_length = 0
@@ -357,7 +366,9 @@ class MangaTranslator:
                 if current_length + len(region.text) > max_batch and current_batch:
                     ctx_batch = Context()
                     ctx_batch.text_regions = current_batch
-                    translated = await self._run_text_translation(config, ctx_batch, reset_samples=is_first_batch_translation)
+                    translated = await self._run_text_translation(
+                        config, ctx_batch, reset_samples=is_first_batch_translation
+                    )
                     is_first_batch_translation = False
                     batched_results.extend(translated)
                     current_batch = []
@@ -367,7 +378,9 @@ class MangaTranslator:
             if current_batch:
                 ctx_batch = Context()
                 ctx_batch.text_regions = current_batch
-                translated = await self._run_text_translation(config, ctx_batch, reset_samples=is_first_batch_translation)
+                translated = await self._run_text_translation(
+                    config, ctx_batch, reset_samples=is_first_batch_translation
+                )
                 is_first_batch_translation = False
                 batched_results.extend(translated)
             combined_ctx.text_regions = batched_results
@@ -375,14 +388,16 @@ class MangaTranslator:
             logger.error(f"Error during translation: {str(e)}", exc_info=True)
             raise e
         await self._report_progress("after-translating")
-        
+
         # Reassign the translated text_regions back to each local context.
         cursor = 0
         for local_ctx, count in zip(contexts, indices):
             if local_ctx.text_regions:
-                local_ctx.text_regions = combined_ctx.text_regions[cursor:cursor + count]
+                local_ctx.text_regions = combined_ctx.text_regions[
+                    cursor : cursor + count
+                ]
                 cursor += count
-        
+
         # Post-translation: process each image sequentially.
         for local_ctx in contexts:
             if not local_ctx.text_regions or local_ctx.text_regions == "cancel":
@@ -403,36 +418,50 @@ class MangaTranslator:
                     self.device,
                     self.verbose,
                 )
-                cv2.imwrite(self._result_path("inpaint_input.png"), cv2.cvtColor(inpaint_input_img, cv2.COLOR_RGB2BGR))
+                cv2.imwrite(
+                    self._result_path("inpaint_input.png"),
+                    cv2.cvtColor(inpaint_input_img, cv2.COLOR_RGB2BGR),
+                )
                 cv2.imwrite(self._result_path("mask_final.png"), local_ctx.mask)
             # -- Inpainting
             # await self._report_progress("inpainting")
             local_ctx.img_inpainted = await self._run_inpainting(config, local_ctx)
             local_ctx.gimp_mask = np.dstack(
-                (cv2.cvtColor(local_ctx.img_inpainted, cv2.COLOR_RGB2BGR), local_ctx.mask)
+                (
+                    cv2.cvtColor(local_ctx.img_inpainted, cv2.COLOR_RGB2BGR),
+                    local_ctx.mask,
+                )
             )
             if self.verbose:
-                cv2.imwrite(self._result_path("inpainted.png"), cv2.cvtColor(local_ctx.img_inpainted, cv2.COLOR_RGB2BGR))
+                cv2.imwrite(
+                    self._result_path("inpainted.png"),
+                    cv2.cvtColor(local_ctx.img_inpainted, cv2.COLOR_RGB2BGR),
+                )
             # -- Rendering
             # await self._report_progress("rendering")
             try:
-                local_ctx.img_rendered = await self._run_text_rendering(config, local_ctx)
+                local_ctx.img_rendered = await self._run_text_rendering(
+                    config, local_ctx
+                )
             except Exception as e:
                 logger.error(f"Error during rendering: {str(e)}", exc_info=True)
                 raise e
             # await self._report_progress("finished", True)
-            local_ctx.result = dump_image(local_ctx.input, local_ctx.img_rendered, local_ctx.img_alpha)
+            local_ctx.result = dump_image(
+                local_ctx.input, local_ctx.img_rendered, local_ctx.img_alpha
+            )
             local_ctx = await self._revert_upscale(config, local_ctx)
-        
+
         await self._report_progress("finished", True)
         # Optionally, attach all batch results to the original context.
         images = [local_ctx.result for local_ctx in contexts]
         ctx.result = await self._zip_images(images)
-        
+
         return ctx
 
-    
-    async def translate(self, image: Image.Image, config: Config, zip_file: bytes = None) -> Context:
+    async def translate(
+        self, image: Image.Image, config: Config, zip_file: bytes = None
+    ) -> Context:
         """
         Translates a PIL image from a manga. Returns dict with result and intermediates of translation.
         Default params are taken from args.py.
@@ -511,7 +540,9 @@ class MangaTranslator:
         await self._report_progress("ocr")
         logger.warning(f"Running OCR on detected text regions: {len(ctx.textlines)}")
         ctx.textlines = await self._run_ocr(config, ctx)
-        logger.warning(f"After Running OCR on detected text regions: {len(ctx.textlines)}")
+        logger.warning(
+            f"After Running OCR on detected text regions: {len(ctx.textlines)}"
+        )
 
         if not ctx.textlines:
             await self._report_progress("skip-no-text", True)
@@ -548,7 +579,9 @@ class MangaTranslator:
         # -- Translation
         await self._report_progress("translating")
         try:
-            ctx.text_regions = await self._run_text_translation(config, ctx, reset_samples=True)
+            ctx.text_regions = await self._run_text_translation(
+                config, ctx, reset_samples=True
+            )
             logger.info(f"Translated text regions: {ctx.text_regions}")
         except Exception as e:
             logger.error(f"Error during translation: {str(e)}", exc_info=True)
@@ -899,14 +932,16 @@ class MangaTranslator:
             text_regions,
             right_to_left=True if config.detector.detector != Detector.ctd else False,
         )
-        
+
         # logger.info(f"Text regions before filter: {list(map(lambda x: x.text[:3], text_regions))}")
         if config.detector.exclude_onomatopoeia:
             text_regions = filter_onomatopoeia(text_regions)
             # logger.info(f"Text regions after filter: {list(map(lambda x: x.text[:3], text_regions))}")
         return text_regions
 
-    async def _run_text_translation(self, config: Config, ctx: Context, reset_samples: bool = False):
+    async def _run_text_translation(
+        self, config: Config, ctx: Context, reset_samples: bool = False
+    ):
         current_time = time.time()
         self._model_usage_timestamps[("translation", config.translator.translator)] = (
             current_time
@@ -941,6 +976,8 @@ class MangaTranslator:
                 print("Don't continue if --save-text is used")
                 exit(-1)
 
+        original_is_horizontal = [region.horizontal for region in ctx.text_regions]
+
         for region, translation in zip(ctx.text_regions, translated_sentences):
             if config.render.uppercase:
                 translation = translation.upper()
@@ -948,11 +985,21 @@ class MangaTranslator:
                 translation = translation.upper()
             region.translation = translation
             region.target_lang = config.translator.target_lang
-            # logger.debug(
-            #     f"alignment: {config.render.alignment}, direction: {config.render.direction}, region alignment: {region._alignment}, region direction: {region._direction}"
-            # )
             region._alignment = config.render.alignment
             region._direction = config.render.direction
+
+        changed_to_horizontal_text_regions = [
+            region
+            for orig, region in zip(original_is_horizontal, ctx.text_regions)
+            if not orig and region.horizontal
+        ]
+
+        expand_text_boxes(
+            changed_to_horizontal_text_regions,
+            ctx.text_regions,
+            config.render.expand_box_width_ratio,
+            ctx.img_rgb,
+        )
 
         # Punctuation correction logic. for translators often incorrectly change quotation marks from the source language to those commonly used in the target language.
         check_items = [
