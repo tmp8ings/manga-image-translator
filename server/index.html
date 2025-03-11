@@ -279,19 +279,14 @@
             </div>
             <div
               class="flex items-center"
-              title="이미지 복원에 사용할 모델을 선택합니다."
+              title="inpainting(감지된 글자 제거)에 사용할 모델을 선택합니다."
             >
               <i class="iconify" data-icon="carbon:paint-brush"></i>
-              <span
-                class="ml-1 mr-2 text-sm"
-                title="이미지 복원에 사용할 모델을 선택합니다."
-                >Inpainter</span
-              >
+              <span class="ml-1 mr-2 text-sm">Inpainter</span>
               <div class="relative">
                 <select
                   class="w-auto pr-8 appearance-none bg-transparent border-b border-gray-300"
                   v-model="inpainter"
-                  title="이미지 복원에 사용할 모델을 선택합니다."
                 >
                   <option value="default">Default</option>
                   <option value="lama_large">Lama Large</option>
