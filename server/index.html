@@ -723,12 +723,15 @@
             const translatedName =
               origName.replace(/\.zip$/i, "") + "-translated.zip";
             // Updated: add cache buster to avoid cached/incomplete zip file
-            this.downloads.push({
+            const downloadItem = {
               job_id: job_id,
               name: translatedName,
               url: `${BASE_URI}translate/with-form/zip-download/${job_id}?t=${Date.now()}`,
               originalName: translatedName,
-            });
+            };
+            this.downloads.push(downloadItem);
+            // Start download automatically
+            this.programmaticDownload(downloadItem);
             this.status = null;
             this.file = null;
             this.finishedMessage = "Translation completed successfully!";
