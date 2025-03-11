@@ -809,6 +809,12 @@ class MangaTranslator:
             ctx.img_rgb.shape[0],
             verbose=self.verbose,
         )
+        text_regions = await run_merge(
+            ctx.textlines,
+            ctx.img_rgb.shape[1],
+            ctx.img_rgb.shape[0],
+            verbose=self.verbose,
+        )
 
         new_text_regions = []
         for region in text_regions:

@@ -224,7 +224,7 @@ def merge_bboxes_text_region(
         yield bbox, nodes, majority_dir, fg_r, fg_g, fg_b, bg_r, bg_g, bg_b
 
 
-def run_merge(
+async def run_merge(
     textlines: List[Quadrilateral], width: int, height: int, verbose: bool = False
 ) -> Tuple[List[Quadrilateral], str]:
     text_regions: List[Quadrilateral] = []
