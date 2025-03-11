@@ -61,7 +61,6 @@ from .colorization import (
 from .rendering import (
     dispatch as dispatch_rendering,
     dispatch_eng_render,
-    expand_text_boxes,
 )
 
 # Will be overwritten by __main__.py if module is being run directly (with python -m)
@@ -988,18 +987,9 @@ class MangaTranslator:
             region._alignment = config.render.alignment
             region._direction = config.render.direction
 
-        changed_to_horizontal_text_regions = [
-            region
-            for orig, region in zip(original_is_horizontal, ctx.text_regions)
-            if not orig and region.horizontal
-        ]
-
-        expand_text_boxes(
-            changed_to_horizontal_text_regions,
-            ctx.text_regions,
-            config.render.expand_box_width_ratio,
-            ctx.img_rgb,
-        )
+        for orig, region in zip(original_is_horizontal, ctx.text_regions):
+            if not orig and region.horizontal:
+                region._is_changed_from_vertical_to_horizontal = True
 
         # Punctuation correction logic. for translators often incorrectly change quotation marks from the source language to those commonly used in the target language.
         check_items = [

@@ -127,6 +127,7 @@ class TextBlock(object):
         self.shadow_offset = shadow_offset
 
         self._is_rearranged = is_rearranged
+        self._is_changed_from_vertical_to_horizontal = False
 
     def __str__(self):
         content = f"TextBlock(text: {self.translation[:3]}, angle: {self.angle}, direction: {self.direction}, alignment: {self.alignment},"
@@ -136,6 +137,10 @@ class TextBlock(object):
 
         content = f"TextBlock(text: {self.translation[:3]}, xyxy: {self.xyxy}, xywh: {self.xywh}, center: {self.center}"
         return content
+
+    @property
+    def is_changed_from_vertical_to_horizontal(self) -> bool:
+        return self._is_changed_from_vertical_to_horizontal
 
     def __repr__(self):
         return self.__str__()

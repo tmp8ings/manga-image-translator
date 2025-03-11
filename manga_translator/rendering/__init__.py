@@ -132,6 +132,9 @@ def is_expand_needed(region: TextBlock, img: np.ndarray) -> bool:
     # log every elements that can effect the decision
     # logger.debug(f"region {region.translation[:3]}({len(region.translation[:3])}): font size: {region.font_size}, unrotated_size: {region.unrotated_size}")
 
+    # Do not expand if region is not changed from vertical to horizontal.
+    if not region.is_changed_from_vertical_to_horizontal:
+        return False
     # Do not expand if region is vertical.
     if region.vertical:
         # logger.debug(f"region {region.translation[:3]} is vertical")
@@ -159,7 +162,6 @@ def is_expand_needed(region: TextBlock, img: np.ndarray) -> bool:
 
 
 def expand_text_boxes(
-    to_be_expanded_change_regions: List[TextBlock],
     all_regions: List[TextBlock],
     expand_box_width_ratio: float,
     img: np.ndarray,
@@ -177,7 +179,7 @@ def expand_text_boxes(
 
     for region in all_regions:
         bbox = region.xyxy  # [x1, y1, x2, y2]
-        if (region not in to_be_expanded_change_regions) or (not is_expand_needed(region, img)):
+        if not is_expand_needed(region, img):
             placed_boxes.append(tuple(bbox.tolist()))
             expanded_regions.append(region)
             continue
@@ -261,9 +263,9 @@ async def dispatch(
     text_regions = list(filter(lambda region: region.translation.strip(), text_regions))
 
     # logger.debug(f"before expand: {text_regions}")
-    # text_regions = expand_text_boxes(
-    #     text_regions, config.render.expand_box_width_ratio, img
-    # )
+    text_regions = expand_text_boxes(
+        text_regions, config.render.expand_box_width_ratio, img
+    )
     # logger.debug(f"after expand: {text_regions}")
 
     log_text = "\n".join([str(i) for i in text_regions])
