@@ -713,7 +713,7 @@
           const url = `${BASE_URI}translate/with-form/zip-status/${job_id}`;
           try {
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 5000);
+            const timeoutId = setTimeout(() => controller.abort(), 60000);
             const response = await fetch(url, { signal: controller.signal });
             clearTimeout(timeoutId);
             if (!response.ok) {
