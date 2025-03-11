@@ -240,48 +240,27 @@ async def run_merge(
         bg_g,
         bg_b,
     ) in merge_bboxes_text_region(textlines, width, height):
-        text = ""
-        logprob_lengths = []
-        for textline_idx in textline_indices:
-            if not text:
-                text = textlines[textline_idx].text
-            else:
-                last_ch = text[-1]
-                cur_ch = textlines[textline_idx].text[0]
-                if ord(last_ch) > 255 and ord(cur_ch) > 255:
-                    text += textlines[textline_idx].text
-                else:
-                    if last_ch == "-" and ord(cur_ch) < 255:
-                        text = text[:-1] + textlines[textline_idx].text
-                    else:
-                        text += " " + textlines[textline_idx].text
-            logprob_lengths.append(
-                (
-                    np.log(textlines[textline_idx].prob),
-                    len(textlines[textline_idx].text),
-                )
-            )
-        vc = count_valuable_text(text)
-        total_logprobs = 0.0
-        for logprob, length in logprob_lengths:
-            total_logprobs += logprob * length
-        total_logprobs /= sum([x[1] for x in logprob_lengths])
+        # Use list of texts instead of manually concatenating them.
+        texts = [textlines[idx].text for idx in textline_indices]
+        logprob_lengths = [
+            (np.log(textlines[idx].prob), len(textlines[idx].text))
+            for idx in textline_indices
+        ]
+        total_logprobs = sum(lp * l for lp, l in logprob_lengths) / sum(l for _, l in logprob_lengths)
+        vc = count_valuable_text("".join(texts))
         if vc > 1:
             txtlns = [textlines[i] for i in textline_indices]
-            font_size = int(min([txtln.font_size for txtln in txtlns]))
-            max_font_size = int(max([txtln.font_size for txtln in txtlns]))
+            font_size = int(min(txtln.font_size for txtln in txtlns))
+            max_font_size = int(max(txtln.font_size for txtln in txtlns))
             angle = np.rad2deg(np.mean([txtln.angle for txtln in txtlns])) - 90
             if abs(angle) < 3:
                 angle = 0
             lines = [txtln.pts for txtln in txtlns]
-            texts = [txtln.text for txtln in txtlns]
             region = TextBlock(
                 lines, texts, font_size=font_size, angle=angle, prob=np.exp(total_logprobs),
                 fg_color=(fg_r, fg_g, fg_b), bg_color=(bg_r, bg_g, bg_b)
             )
             region.assigned_direction = majority_dir
-            region.textlines = []
-            for textline_idx in textline_indices:
-                region.textlines.append(textlines[textline_idx])
+            region.textlines = txtlns
             text_regions.append(region)
     return text_regions
