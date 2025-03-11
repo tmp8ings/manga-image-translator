@@ -770,12 +770,12 @@ class MangaTranslator:
         #     ctx.img_rgb.shape[0],
         #     verbose=self.verbose,
         # )
-        text_regions = await run_merge(
-            ctx.textlines,
-            ctx.img_rgb.shape[1],
-            ctx.img_rgb.shape[0],
-            verbose=self.verbose,
-        )
+        # text_regions = await run_merge(
+        #     ctx.textlines,
+        #     ctx.img_rgb.shape[1],
+        #     ctx.img_rgb.shape[0],
+        #     verbose=self.verbose,
+        # )
         # Filter out languages to skip
         if config.translator.skip_lang is not None:
             skip_langs = [

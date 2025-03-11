@@ -5,7 +5,7 @@ import unicodedata
 
 import cv2
 from manga_translator.config import Config
-from manga_translator.utils import Quadrilateral, quadrilateral_can_merge_region_coarse
+from manga_translator.utils import Quadrilateral, TextBlock, quadrilateral_can_merge_region_coarse
 import numpy as np
 import networkx as nx
 
@@ -226,8 +226,8 @@ def merge_bboxes_text_region(
 
 async def run_merge(
     textlines: List[Quadrilateral], width: int, height: int, verbose: bool = False
-) -> Tuple[List[Quadrilateral], str]:
-    text_regions: List[Quadrilateral] = []
+) -> List[TextBlock]:
+    text_regions: List[TextBlock] = []
     new_textlines = []
     for (
         poly_regions,
@@ -268,16 +268,17 @@ async def run_merge(
         total_logprobs /= sum([x[1] for x in logprob_lengths])
         # filter text region without characters
         if vc > 1:
-            region = Quadrilateral(
-                poly_regions,
-                text,
-                np.exp(total_logprobs),
-                fg_r,
-                fg_g,
-                fg_b,
-                bg_r,
-                bg_g,
-                bg_b,
+            # Create TextBlock instead of Quadrilateral.
+            # Use poly_regions as the merged bounding box wrapped in a list.
+            # Use the first textline's font_size and angle as representative.
+            region = TextBlock(
+                [poly_regions],
+                [text],
+                font_size=textlines[textline_indices[0]].font_size,
+                angle=textlines[textline_indices[0]].angle,
+                prob=np.exp(total_logprobs),
+                fg_color=(fg_r, fg_g, fg_b),
+                bg_color=(bg_r, bg_g, bg_b),
             )
             region.clip(width, height)
             region.assigned_direction = majority_dir
