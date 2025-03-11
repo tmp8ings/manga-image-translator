@@ -83,7 +83,7 @@
             title="감지된 텍스트의 배열 방향을 설정합니다."
           >
             <i class="iconify" data-icon="carbon:text-align-left"></i>
-            <span class="ml-1 mr-2 text-sm">Orientation</span>
+            <span class="ml-1 mr-2 text-sm">텍스트 방향</span>
             <div class="relative">
               <select
                 class="w-auto pr-8 appearance-none bg-transparent border-b border-gray-300"
@@ -178,6 +178,14 @@
                 class="iconify absolute top-1.5 right-1 pointer-events-none"
                 data-icon="carbon:chevron-down"
               ></i>
+            </div>
+          </div>
+          <!-- New basic setting for expand_box_width_ratio -->
+          <div class="flex items-center" title="세로 쓰기를 가로 쓰기로 전환 시, 좌우 너비를 조정하는 비율">
+            <i class="iconify" data-icon="carbon:resize-horizontal"></i>
+            <span class="ml-1 mr-2 text-sm">가로 너비 확장</span>
+            <div class="relative">
+              <input type="number" step="0.1" class="w-9ch appearance-none bg-transparent border-b border-gray-300" v-model="expandBoxWidthRatio" placeholder="2.0" />
             </div>
           </div>
         </div>
@@ -289,7 +297,7 @@
                 class="iconify"
                 data-icon="material-symbols:adjust-outline"
               ></i>
-              <span class="ml-1 mr-2 text-sm">Mask Offset</span>
+              <span class="ml-1 mr-2 text-sm">Inpainting Mask Offset</span>
               <div class="relative">
                 <input
                   type="number"
@@ -310,16 +318,20 @@
               title="인식률 향상을 위해 이미지의 색상을 반전시킵니다."
             >
               <input type="checkbox" v-model="detInvert" />
-              <label class="ml-1 mr-2 text-sm">Invert Colors</label>
+              <label class="ml-1 mr-2 text-sm">OCR 시 색상 반전</label>
             </div>
             <div
               class="flex items-center"
               title="인식률 향상을 위해 감마 보정을 적용합니다."
             >
               <input type="checkbox" v-model="detGammaCorrect" />
-              <label class="ml-1 mr-2 text-sm">Gamma Correction</label>
+              <label class="ml-1 mr-2 text-sm">OCR 시 감마 보정</label>
             </div>
-            <!-- Removed OCR Model from here -->
+            <!-- New advanced setting for exclude_onomatopoeia -->
+            <div class="flex items-center" title="배경의 효과음으로 추정되는 텍스트는 번역에서 제외">
+              <input type="checkbox" v-model="excludeOnomatopoeia" />
+              <label class="ml-1 mr-2 text-sm">효과음 제외</label>
+            </div>
           </div>
         </div>
 
@@ -562,6 +574,10 @@
         // added for toggling advanced settings
         advancedVisible: false,
 
+        // New data properties:
+        expandBoxWidthRatio: 2.0,
+        excludeOnomatopoeia: true,
+
         ondrop(e) {
           const file = e.dataTransfer?.files?.[0];
           if (
@@ -700,10 +716,12 @@
                     "text_threshold": ${this.textThreshold},
                     "unclip_ratio": ${this.customUnclipRatio},
                     "det_invert": ${this.detInvert},
-                    "det_gamma_correct": ${this.detGammaCorrect}
+                    "det_gamma_correct": ${this.detGammaCorrect},
+                    "exclude_onomatopoeia": ${this.excludeOnomatopoeia}
                 },
                 "render": {
-                    "direction": "${this.renderTextDirection}"
+                    "direction": "${this.renderTextDirection}",
+                    "expand_box_width_ratio": ${this.expandBoxWidthRatio}
                 },
                 "translator": {
                     "translator": "${this.translator}",
