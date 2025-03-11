@@ -8,6 +8,7 @@ import sys
 import logging
 import traceback
 from argparse import Namespace
+from typing import Dict
 import uuid
 import tempfile  # 추가: 임시 파일 처리를 위한 모듈
 from fastapi import BackgroundTasks
@@ -15,6 +16,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from concurrent.futures import ThreadPoolExecutor
 import asyncio  # for running async functions synchronously in the thread
 import time  # add at the top if not present
+from starlette.background import BackgroundTask  # added import
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
@@ -350,7 +352,7 @@ def prepare(args):
     os.makedirs(folder_name)
 
 
-jobs = {}  # Global dictionary for zip jobs now storing Job objects
+jobs: Dict[str, Job] = {}  # Global dictionary for zip jobs now storing Job objects
 
 
 async def process_zip(job_id: str, req: Request, image_bytes: bytes, config_str: str):
@@ -457,12 +459,20 @@ async def zip_download(job_id: str, filename: str = None):
         if not filename.endswith('.zip'):
             filename += '.zip'
     
-    # FileResponse를 사용하여 파일 직접 스트리밍
+    # Define a cleanup function to delete the job after response is sent
+    def cleanup_job(job_id: str):
+        time.sleep(10) # Delay for 10 seconds before cleanup
+        job = jobs.get(job_id)
+        if job:
+            job.cleanup()  # Clean up resources
+            del jobs[job_id]
+    
+    # Return FileResponse with a BackgroundTask for cleanup
     return FileResponse(
         path=file_path,
         filename=filename,
         media_type="application/zip",
-        # 다운로드를 강제하는 헤더 추가
+        background=BackgroundTask(cleanup_job, job_id),
         headers={
             "Content-Disposition": f"attachment; filename=\"{filename}\"",
             "Content-Length": str(job.file_size),

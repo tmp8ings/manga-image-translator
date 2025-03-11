@@ -843,31 +843,21 @@
           document.body.removeChild(a);
         },
         // 새로운 프로그래매틱 다운로드 핸들러 추가
-        async programmaticDownload(item) {
+        async _programmaticDownload(item) {
           try {
             this.status = "downloading";
-            const url = `${item.url}&filename=${encodeURIComponent(item.name)}`;
+            const url = `${item.url}&filename=${encodeURIComponent(item.name)}&t=${Date.now()}`;
 
             // Fetch API로 파일 다운로드
             const response = await fetch(url);
 
             if (!response.ok || response.status !== 200) {
               console.error("Download failed:", response.statusText);
-              // 실패 시 재시도
-              this.retryDownload(item);
-              return;
+              return false;
             }
 
             // 응답을 blob으로 변환
             const blob = await response.blob();
-
-            // 파일 크기가 너무 작으면 (오류 응답일 가능성) 재시도
-            if (blob.size < 10000) {
-              // 10KB 미만이면 의심
-              console.warn("Downloaded file too small, retrying...");
-              this.retryDownload(item);
-              return;
-            }
 
             // 다운로드 링크 생성 및 클릭
             const downloadUrl = window.URL.createObjectURL(blob);
@@ -879,26 +869,22 @@
             document.body.removeChild(a);
 
             // URL 해제
-            setTimeout(() => {
-              window.URL.revokeObjectURL(downloadUrl);
-            }, 100);
+            await sleep(100);
+            window.URL.revokeObjectURL(downloadUrl);
 
             this.status = null;
+            return true;
           } catch (err) {
             console.error("Download error:", err);
-            this.retryDownload(item);
+            return false;
           }
         },
-
-        // 다운로드 재시도 함수
-        retryDownload(item) {
-          // 캐시 버스터 업데이트
-          item.url = item.url.split("?")[0] + `?t=${Date.now()}`;
-
-          // 1초 후 재시도
-          setTimeout(() => {
-            this.programmaticDownload(item);
-          }, 1000);
+        async programmaticDownload(item) {
+          for(let i = 0; i < 3; i++) {
+            const success = await this._programmaticDownload(item);
+            if (success) break;
+            await sleep(2000); // 2초 후 재시도
+          }
         },
       }).mount();
     </script>
