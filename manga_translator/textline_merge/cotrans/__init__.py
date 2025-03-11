@@ -284,4 +284,4 @@ async def run_merge(
             text_regions.append(region)
             for textline_idx in textline_indices:
                 region.textlines.append(textlines[textline_idx])
-    return text_regions, "textline-merge-20220423"
+    return text_regions
