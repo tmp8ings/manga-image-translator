@@ -234,9 +234,9 @@ class MangaTranslator:
             logger.error(f"Error during _translate: {str(e)}", exc_info=True)
             raise e
 
-    async def _unzip_image(self, zipped_image: bytes) -> List[Image.Image]:
+    async def _unzip_image(self, zipped_image: bytes) -> List[tuple[str, Image.Image]]:
         """
-        Unzips the provided zip file and returns a list of PIL images.
+        Unzips the provided zip file and returns a list of tuples (filename, PIL image).
         """
         images = []
         with zipfile.ZipFile(io.BytesIO(zipped_image), "r") as zip_ref:
@@ -244,26 +244,26 @@ class MangaTranslator:
                 if file_name.lower().endswith((".png", ".jpg", ".jpeg")):
                     with zip_ref.open(file_name) as file:
                         image = Image.open(file)
-                        images.append(image.convert("RGBA"))
+                        images.append((file_name, image.convert("RGBA")))
         return images
 
-    async def _zip_images(self, images: List[Image.Image]) -> bytes:
+    async def _zip_images(self, files: List[tuple[str, Image.Image]]) -> bytes:
         """
-        Zips the provided list of PIL images and returns the zip file as bytes.
+        Zips the provided list of (filename, PIL image) tuples and returns the zip file as bytes.
         """
         zip_buffer = io.BytesIO()
         with zipfile.ZipFile(zip_buffer, "w") as zip_ref:
-            for i, image in enumerate(images):
+            for file_name, image in files:
                 img_buffer = io.BytesIO()
                 image.save(img_buffer, format="PNG")
                 img_buffer.seek(0)
-                zip_ref.writestr(f"image_{i}.png", img_buffer.read())
+                zip_ref.writestr(file_name, img_buffer.read())
         zip_buffer.seek(0)
         return zip_buffer.getvalue()
 
     async def _batch_translate(self, config: Config, ctx: Context) -> Context:
         zipped_image = ctx.zipped_image
-        images = await self._unzip_image(zipped_image)
+        unzipped = await self._unzip_image(zipped_image)
 
         if self._detector_cleanup_task is None:
             self._detector_cleanup_task = asyncio.create_task(
@@ -271,9 +271,10 @@ class MangaTranslator:
             )
         contexts: List[Context] = []
         # Pre-translation: process each image sequentially.
-        for img in images:
+        for original_filename, img in unzipped:
             local_ctx = Context()
             local_ctx.input = img
+            local_ctx.filename = original_filename  # store original filename
             # -- Colorization
             if config.colorizer.colorizer != Colorizer.none:
                 # await self._report_progress("colorizing")
@@ -454,8 +455,8 @@ class MangaTranslator:
 
         await self._report_progress("finished", True)
         # Optionally, attach all batch results to the original context.
-        images = [local_ctx.result for local_ctx in contexts]
-        ctx.result = await self._zip_images(images)
+        files_to_zip = [(local_ctx.filename, local_ctx.result) for local_ctx in contexts]
+        ctx.result = await self._zip_images(files_to_zip)
 
         return ctx
 

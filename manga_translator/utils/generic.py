@@ -50,6 +50,7 @@ class ContextType(Protocol):
     result: Image.Image
     gimp_mask: np.ndarray
     render_mask: Optional[np.ndarray]
+    filename: Optional[str]
 
 
 # Adapted from argparse.Namespace
