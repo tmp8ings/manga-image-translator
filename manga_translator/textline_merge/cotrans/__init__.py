@@ -5,8 +5,7 @@ import unicodedata
 
 import cv2
 from manga_translator.config import Config
-from manga_translator.utils import Quadrilateral, quadrilateral_can_merge_region_coarse
-from manga_translator.utils.textblock import TextBlock
+from manga_translator.utils import Quadrilateral, quadrilateral_can_merge_region_coarse, TextBlock
 import numpy as np
 import networkx as nx
 
@@ -229,6 +228,7 @@ async def run_merge(
     textlines: List[Quadrilateral], width: int, height: int, verbose: bool = False
 ) -> List[TextBlock]:
     text_regions: List[TextBlock] = []
+    new_textlines = []
     for (
         poly_regions,
         textline_indices,
@@ -267,21 +267,25 @@ async def run_merge(
             total_logprobs += logprob * length
         total_logprobs /= sum([x[1] for x in logprob_lengths])
         if vc > 1:
-            txtlns = [textlines[i] for i in textline_indices]
-            font_size = int(min([txtln.font_size for txtln in txtlns]))
-            max_font_size = int(max([txtln.font_size for txtln in txtlns]))
-            angle = np.rad2deg(np.mean([txtln.angle for txtln in txtlns])) - 90
+            font_size = int(min([textlines[i].font_size for i in textline_indices]))
+            angle = np.rad2deg(np.mean([textlines[i].angle for i in textline_indices])) - 90
             if abs(angle) < 3:
                 angle = 0
-            lines = [txtln.pts for txtln in txtlns]
-            texts = [txtln.text for txtln in txtlns]
-            region = TextBlock(
-                lines, texts, font_size=font_size, angle=angle, prob=np.exp(total_logprobs),
-                fg_color=(fg_r, fg_g, fg_b), bg_color=(bg_r, bg_g, bg_b)
+            # Create a TextBlock using poly_regions as its single line and the merged text.
+            region_block = TextBlock(
+                lines=[poly_regions],
+                texts=[text],
+                font_size=font_size,
+                angle=angle,
+                prob=np.exp(total_logprobs),
+                fg_color=(fg_r, fg_g, fg_b),
+                bg_color=(bg_r, bg_g, bg_b)
             )
-            region.assigned_direction = majority_dir
-            region.textlines = []
+            region_block._direction = majority_dir
+            # Attach original textlines if needed.
+            if not hasattr(region_block, "textlines"):
+                region_block.textlines = []
             for textline_idx in textline_indices:
-                region.textlines.append(textlines[textline_idx])
-            text_regions.append(region)
+                region_block.textlines.append(textlines[textline_idx])
+            text_regions.append(region_block)
     return text_regions
