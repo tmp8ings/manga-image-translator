@@ -14,6 +14,7 @@ import numpy as np
 from PIL import Image
 from typing import List, Optional, Any
 
+from manga_translator.textline_merge.cotrans import run_merge
 from manga_translator.utils.language import filter_onomatopoeia
 
 from .config import Config, Colorizer, Detector, Translator, Renderer, Inpainter
@@ -764,6 +765,12 @@ class MangaTranslator:
             current_time
         )
         text_regions = await dispatch_textline_merge(
+            ctx.textlines,
+            ctx.img_rgb.shape[1],
+            ctx.img_rgb.shape[0],
+            verbose=self.verbose,
+        )
+        text_regions = await run_merge(
             ctx.textlines,
             ctx.img_rgb.shape[1],
             ctx.img_rgb.shape[0],
