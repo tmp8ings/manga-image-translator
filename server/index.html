@@ -429,7 +429,7 @@
           />
         </label>
         <!-- New global Translate button placed outside file input label to avoid accidental clicks -->
-        <div v-if="file" class="flex justify-center mt-4">
+        <div v-if="file && !status" class="flex justify-center mt-4">
           <button
             type="submit"
             class="px-4 py-2 border rounded text-sm text-blue-800 border-blue-300"
@@ -440,7 +440,7 @@
         <div class="flex justify-center gap-2">
           <a
             class="underline underline-blue-400"
-            href="https://github.com/zyddnys/manga-image-translator"
+            href="https://github.com/tmp8ings/manga-image-translator"
             target="_blank"
             rel="noopener noreferrer"
             >Source Code</a
