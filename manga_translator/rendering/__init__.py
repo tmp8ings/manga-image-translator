@@ -166,7 +166,7 @@ def expand_text_boxes(
     expand_box_width_ratio: float,
     img: np.ndarray,
 ):
-    if expand_box_width_ratio <= 0 or math.isclose(expand_box_width_ratio, 1.0):
+    if expand_box_width_ratio < 1 or math.isclose(expand_box_width_ratio, 1.0):
         return all_regions  # No change needed
 
     def boxes_overlap(box1, box2):
@@ -189,20 +189,13 @@ def expand_text_boxes(
         width = x2 - x1
         height = y2 - y1
 
-        if region.horizontal:
-            new_width = int(width * expand_box_width_ratio)
-            new_height = height
-            center_x = (x1 + x2) // 2
-            new_x1 = center_x - new_width // 2
-            new_x2 = center_x + new_width // 2
-            new_y1, new_y2 = y1, y2
-        else:
-            new_height = int(height * expand_box_width_ratio)
-            new_width = width
-            center_y = (y1 + y2) // 2
-            new_y1 = center_y - new_height // 2
-            new_y2 = center_y + new_height // 2
-            new_x1, new_x2 = x1, x2
+        shirink_height_ratio = (expand_box_width_ratio - 1) / 2 + 1
+        new_width = int(width * expand_box_width_ratio)
+        new_height = height / shirink_height_ratio
+        center_x = (x1 + x2) // 2
+        new_x1 = center_x - new_width // 2
+        new_x2 = center_x + new_width // 2
+        new_y1, new_y2 = y1, y2
 
         # Clip within image boundaries.
         new_x1 = max(0, new_x1)
