@@ -40,6 +40,8 @@ from server.request_extraction import (
 from server.to_json import to_translation, TranslationResponse
 from server.job import Job  # Import the new Job class
 
+import datetime
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -263,13 +265,30 @@ async def stream_bytes_form(
     "/translate/with-form/image/stream",
     response_class=StreamingResponse,
     tags=["api", "form"],
-    response_description="A stream over elements with strucure(1byte status, 4 byte size, n byte data) status code are 0,1,2,3,4 0 is result data, 1 is progress report, 2 is error, 3 is waiting queue position, 4 is waiting for translator instance",
+    response_description="A stream over elements with structure (1byte status, 4 byte size, n byte data) status codes: 0 is result data, 1 is progress report, 2 is error, 3 is waiting queue position, 4 is waiting for translator instance",
 )
 async def stream_image_form(
     req: Request, image: UploadFile = File(...), config: str = Form("{}")
 ) -> StreamingResponse:
     img = await image.read()
-    return await while_streaming(req, transform_to_image, Config.parse_raw(config), img)
+    # Create folder based on current time
+    folder = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+    os.makedirs(folder, exist_ok=True)
+    # Save input image using original filename
+    input_path = os.path.join(folder, image.filename)
+    with open(input_path, "wb") as f:
+        f.write(img)
+
+    # Define wrapper that saves the output image before returning it
+    def transform_and_save(ctx):
+        out_bytes = transform_to_image(ctx)
+        output_filename = "translated_" + image.filename
+        output_path = os.path.join(folder, output_filename)
+        with open(output_path, "wb") as f:
+            f.write(out_bytes)
+        return out_bytes
+
+    return await while_streaming(req, transform_and_save, Config.parse_raw(config), img)
 
 
 @app.post("/queue-size", response_model=int, tags=["api", "json"])
@@ -319,11 +338,11 @@ def start_translator_client_proc(host: str, port: int, nonce: str, params: Names
     if params.verbose:
         cmds.append("--verbose")
     if params.models_ttl:
-        cmds.append('--models-ttl=%s' % params.models_ttl)
-    if params.pre_dict: 
-        cmds.extend(['--pre-dict', params.pre_dict]) 
-    if params.pre_dict: 
-        cmds.extend(['--post-dict', params.post_dict])         
+        cmds.append("--models-ttl=%s" % params.models_ttl)
+    if params.pre_dict:
+        cmds.extend(["--pre-dict", params.pre_dict])
+    if params.pre_dict:
+        cmds.extend(["--post-dict", params.post_dict])
     base_path = os.path.dirname(os.path.abspath(__file__))
     parent = os.path.dirname(base_path)
     proc = subprocess.Popen(cmds, cwd=parent)
@@ -358,20 +377,27 @@ def prepare(args):
 jobs: Dict[str, Job] = {}  # Global dictionary for zip jobs now storing Job objects
 
 
-async def process_zip(job_id: str, req: Request, image_bytes: bytes, config_str: str):
+async def process_zip(job_id: str, req: Request, image_bytes: bytes, config_str: str, orig_filename: str):
     try:
         job = jobs[job_id]
         config_obj = Config.parse_raw(config_str)
+        # Create folder based on current time
+        folder = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+        os.makedirs(folder, exist_ok=True)
+        # Save original zip file using original filename
+        original_path = os.path.join(folder, orig_filename)
+        with open(original_path, "wb") as f:
+            f.write(image_bytes)
         # Start while_polling in background so polling can update the task timestamp
         poll_task = asyncio.create_task(while_polling(req, config_obj, image_bytes))
         job.set_poll_task(poll_task)
         result, _ = await poll_task  # waiting for result from polling_in_queue
-        # 결과를 임시 파일에 저장
-        temp_file = os.path.join(tempfile.gettempdir(), f"{job_id}.zip")
-        with open(temp_file, "wb") as f:
+        output_filename = "translated_" + orig_filename
+        output_path = os.path.join(folder, output_filename)
+        with open(output_path, "wb") as f:
             f.write(result.result)
-        # 임시 파일의 경로와 원본 크기 저장
-        job.set_finished(temp_file, len(result.result))
+        # Save output file path and size
+        job.set_finished(output_path, len(result.result))
     except Exception as e:
         logger.error(f"Error processing zip job {job_id}: {str(e)}", exc_info=True)
         job.set_error(str(e))
@@ -392,7 +418,7 @@ async def zip_submit(
     # Create a new Job object
     jobs[job_id] = Job(job_id)
     logger.info(f"Job {job_id} created")
-    
+
     # Prune expired jobs
     current_time = time.time()
     for job in list(jobs.keys()):
@@ -400,10 +426,10 @@ async def zip_submit(
         if jobs[job].is_expired():
             jobs[job].cleanup()  # Clean up any resources
             del jobs[job]
-    
+
     logger.info(f"Job {job_id} is being processed")
-    asyncio.create_task(process_zip(job_id, req, image_bytes, config))
-    
+    asyncio.create_task(process_zip(job_id, req, image_bytes, config, image.filename))
+
     logger.info(f"Job {job_id} submitted for processing")
     return JSONResponse(content={"job_id": job_id})
 
@@ -447,29 +473,29 @@ async def zip_download(job_id: str, filename: str = None):
         raise HTTPException(404, detail="Job not found")
     if job.status != "finished":
         raise HTTPException(400, detail="Job not finished")
-    
+
     # 임시 파일 경로 가져오기
     file_path = job.file_path
     if not file_path or not os.path.exists(file_path):
         raise HTTPException(500, detail="File not available")
-    
+
     # 파일명 생성 - 클라이언트에서 제공한 이름 사용 또는 기본값 생성
     if not filename:
         filename = f"translated-{job_id}.zip"
     else:
         # 안전한 파일명인지 확인하고 .zip 확장자를 갖도록 함
         filename = os.path.basename(filename)
-        if not filename.endswith('.zip'):
-            filename += '.zip'
-    
+        if not filename.endswith(".zip"):
+            filename += ".zip"
+
     # Define a cleanup function to delete the job after response is sent
     def cleanup_job(job_id: str):
-        time.sleep(10) # Delay for 10 seconds before cleanup
+        time.sleep(10)  # Delay for 10 seconds before cleanup
         job = jobs.get(job_id)
         if job:
             job.cleanup()  # Clean up resources
             del jobs[job_id]
-    
+
     # Return FileResponse with a BackgroundTask for cleanup
     return FileResponse(
         path=file_path,
@@ -477,12 +503,12 @@ async def zip_download(job_id: str, filename: str = None):
         media_type="application/zip",
         background=BackgroundTask(cleanup_job, job_id),
         headers={
-            "Content-Disposition": f"attachment; filename=\"{filename}\"",
+            "Content-Disposition": f'attachment; filename="{filename}"',
             "Content-Length": str(job.file_size),
             "Cache-Control": "no-cache, no-store, must-revalidate",
             "Pragma": "no-cache",
-            "Expires": "0"
-        }
+            "Expires": "0",
+        },
     )
 
 
@@ -501,7 +527,7 @@ if __name__ == "__main__":
         # Set Uvicorn log level and extend keep-alive timeout for large zip responses
         log_level = "debug" if args.verbose else "info"
         proc, host, port = prepare(args)
-        
+
         # Wait until the translator (share.py) server is fully available
         health_url = f"http://{host}:{port}/health"
         while True:
