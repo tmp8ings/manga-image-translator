@@ -769,9 +769,6 @@ class MangaTranslator:
         self._model_usage_timestamps[("textline_merge", "textline_merge")] = (
             current_time
         )
-        logger.info(
-            f"Running textline merge on {len(ctx.textlines)} detected textlines"
-        )
         text_regions = await dispatch_textline_merge(
             ctx.textlines,
             ctx.img_rgb.shape[1],
