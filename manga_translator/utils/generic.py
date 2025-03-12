@@ -931,22 +931,22 @@ def quadrilateral_can_merge_region(
     p2 = Polygon(b.pts)
     dist = p1.distance(p2)
     if dist > discard_connection_gap * char_size:
-        logging.debug(
+        logging.warning(
             f"quadrilateral_can_merge_region({a_text}, {b_text}): Return False - distance {dist} exceeds threshold {discard_connection_gap * char_size} (discard_connection_gap * char_size)"
         )
         return False
     if max(a.font_size, b.font_size) / char_size > font_size_ratio_tol:
-        logging.debug(
+        logging.warning(
             f"quadrilateral_can_merge_region({a_text}, {b_text}): Return False - font size ratio {max(a.font_size, b.font_size) / char_size} exceeds tolerance {font_size_ratio_tol}"
         )
         return False
     if a.aspect_ratio > aspect_ratio_tol and b.aspect_ratio < 1.0 / aspect_ratio_tol:
-        logging.debug(
+        logging.warning(
             f"quadrilateral_can_merge_region({a_text}, {b_text}): Return False - a.aspect_ratio {a.aspect_ratio} > {aspect_ratio_tol} and b.aspect_ratio {b.aspect_ratio} < {1.0 / aspect_ratio_tol}"
         )
         return False
     if b.aspect_ratio > aspect_ratio_tol and a.aspect_ratio < 1.0 / aspect_ratio_tol:
-        logging.debug(
+        logging.warning(
             f"quadrilateral_can_merge_region({a_text}, {b_text}): Return False - b.aspect_ratio {b.aspect_ratio} > {aspect_ratio_tol} and a.aspect_ratio {a.aspect_ratio} < {1.0 / aspect_ratio_tol}"
         )
         return False
@@ -955,17 +955,17 @@ def quadrilateral_can_merge_region(
     if a_aa and b_aa:
         if dist < char_size * char_gap_tolerance:
             if abs(x1 + w1 // 2 - (x2 + w2 // 2)) < char_gap_tolerance2:
-                logging.debug(
+                logging.warning(
                     f"quadrilateral_can_merge_region({a_text}, {b_text}): Return True - approx aligned with center proximity met"
                 )
                 return True
             if w1 > h1 * ratio and h2 > w2 * ratio:
-                logging.debug(
+                logging.warning(
                     f"quadrilateral_can_merge_region({a_text}, {b_text}): Return False - incompatible horizontal dimensions detected"
                 )
                 return False
             if w2 > h2 * ratio and h1 > w1 * ratio:
-                logging.debug(
+                logging.warning(
                     f"quadrilateral_can_merge_region({a_text}, {b_text}): Return False - incompatible horizontal dimensions detected (case 2)"
                 )
                 return False
@@ -974,7 +974,7 @@ def quadrilateral_can_merge_region(
                     abs(x1 - x2) < char_size * char_gap_tolerance2
                     or abs(x1 + w1 - (x2 + w2)) < char_size * char_gap_tolerance2
                 )
-                logging.debug(
+                logging.warning(
                     f"quadrilateral_can_merge_region({a_text}, {b_text}): Return {condition} - horizontal condition (w1/h1)"
                 )
                 return condition
@@ -983,16 +983,16 @@ def quadrilateral_can_merge_region(
                     abs(y1 - y2) < char_size * char_gap_tolerance2
                     or abs(y1 + h1 - (y2 + h2)) < char_size * char_gap_tolerance2
                 )
-                logging.debug(
+                logging.warning(
                     f"quadrilateral_can_merge_region({a_text}, {b_text}): Return {condition} - vertical condition"
                 )
                 return condition
-            logging.debug(
+            logging.warning(
                 f"quadrilateral_can_merge_region({a_text}, {b_text}): Return False - none of the horizontal/vertical conditions met"
             )
             return False
         else:
-            logging.debug(
+            logging.warning(
                 f"quadrilateral_can_merge_region({a_text}, {b_text}): Return False - distance {dist} not within tolerance for approx aligned"
             )
             return False
@@ -1002,21 +1002,21 @@ def quadrilateral_can_merge_region(
         fs_b = b.font_size
         fs = min(fs_a, fs_b)
         if a.poly_distance(b) > fs * char_gap_tolerance2:
-            logging.debug(
+            logging.warning(
                 f"quadrilateral_can_merge_region({a_text}, {b_text}): Return False - poly_distance {a.poly_distance(b)} exceeds threshold {fs * char_gap_tolerance2} (fs * char_gap_tolerance2)"
             )
             return False
         if abs(fs_a - fs_b) / fs > 0.25:
-            logging.debug(
+            logging.warning(
                 f"quadrilateral_can_merge_region({a_text}, {b_text}): Return False - font size difference ratio {abs(fs_a - fs_b) / fs} exceeds 0.25"
             )
             return False
-        logging.debug(
+        logging.warning(
             f"quadrilateral_can_merge_region({a_text}, {b_text}): Return True - non-approx aligned conditions met"
         )
         return True
 
-    logging.debug(f"quadrilateral_can_merge_region({a_text}, {b_text}): Return False - default case")
+    logging.warning(f"quadrilateral_can_merge_region({a_text}, {b_text}): Return False - default case")
     return False
 
 
