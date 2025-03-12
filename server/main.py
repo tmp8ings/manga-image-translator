@@ -273,6 +273,7 @@ async def stream_image_form(
     img = await image.read()
     # Create folder based on current time
     folder = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+    folder = os.path.join("logging", folder)
     os.makedirs(folder, exist_ok=True)
     # Save input image using original filename
     input_path = os.path.join(folder, image.filename)
@@ -383,6 +384,7 @@ async def process_zip(job_id: str, req: Request, image_bytes: bytes, config_str:
         config_obj = Config.parse_raw(config_str)
         # Create folder based on current time
         folder = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+        folder = os.path.join("logging", folder)
         os.makedirs(folder, exist_ok=True)
         # Save original zip file using original filename
         original_path = os.path.join(folder, orig_filename)
