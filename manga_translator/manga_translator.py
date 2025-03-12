@@ -52,6 +52,7 @@ from .translators import (
     LANGDETECT_MAP,
     dispatch as dispatch_translation,
     prepare as prepare_translation,
+    reset_samples,
     unload as unload_translation,
 )
 from .colorization import (
@@ -354,6 +355,10 @@ class MangaTranslator:
                 combined_ctx.text_regions.extend(local_ctx.text_regions)
 
         await self._report_progress("translating")
+
+        reset_samples(config.translator.translator_gen)
+
+        
         try:
             # Batch translation based on cumulative text length
             max_batch = getattr(
@@ -362,15 +367,13 @@ class MangaTranslator:
             batched_results = []
             current_batch = []
             current_length = 0
-            is_first_batch_translation = True
             for region in combined_ctx.text_regions:
                 if current_length + len(region.text) > max_batch and current_batch:
                     ctx_batch = Context()
                     ctx_batch.text_regions = current_batch
                     translated = await self._run_text_translation(
-                        config, ctx_batch, reset_samples=is_first_batch_translation
+                        config, ctx_batch
                     )
-                    is_first_batch_translation = False
                     batched_results.extend(translated)
                     current_batch = []
                     current_length = 0
@@ -380,9 +383,8 @@ class MangaTranslator:
                 ctx_batch = Context()
                 ctx_batch.text_regions = current_batch
                 translated = await self._run_text_translation(
-                    config, ctx_batch, reset_samples=is_first_batch_translation
+                    config, ctx_batch
                 )
-                is_first_batch_translation = False
                 batched_results.extend(translated)
             combined_ctx.text_regions = batched_results
         except Exception as e:
@@ -579,9 +581,11 @@ class MangaTranslator:
 
         # -- Translation
         await self._report_progress("translating")
+        reset_samples(config.translator.translator_gen)
+        
         try:
             ctx.text_regions = await self._run_text_translation(
-                config, ctx, reset_samples=True
+                config, ctx
             )
             logger.info(f"Translated text regions: {ctx.text_regions}")
         except Exception as e:
@@ -953,7 +957,7 @@ class MangaTranslator:
         return text_regions
 
     async def _run_text_translation(
-        self, config: Config, ctx: Context, reset_samples: bool = False
+        self, config: Config, ctx: Context
     ):
         current_time = time.time()
         self._model_usage_timestamps[("translation", config.translator.translator)] = (
@@ -973,7 +977,6 @@ class MangaTranslator:
                 self.use_mtpe,
                 ctx,
                 "cpu" if self._gpu_limited_memory else self.device,
-                reset_samples=reset_samples,
             )
             # logger.info(f"translated_sentences: {translated_sentences}")
 
