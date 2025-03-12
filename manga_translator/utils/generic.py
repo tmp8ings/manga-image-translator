@@ -15,7 +15,6 @@ import json
 from shapely import affinity
 from shapely.geometry import Polygon, MultiPoint
 
-from manga_translator.utils.log import get_logger
 
 
 from .textblock import TextBlock
@@ -29,8 +28,6 @@ except AttributeError:  # Supports Python versions below 3.8
 
 MODULE_PATH = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 BASE_PATH = os.path.dirname(MODULE_PATH)
-
-logger = get_logger("utils")
 
 
 class ContextType(Protocol):
@@ -924,6 +921,8 @@ def quadrilateral_can_merge_region(
     font_size_ratio_tol=1.5,
     aspect_ratio_tol=2,
 ) -> bool:
+    from manga_translator.utils.log import get_logger
+    logger = get_logger("utils")
     a_text = a.text[:5]
     b_text = b.text[:5]
     b1 = a.aabb
