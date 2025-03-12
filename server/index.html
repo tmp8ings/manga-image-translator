@@ -320,12 +320,7 @@
                   class="w-auto pr-8 appearance-none bg-transparent border-b border-gray-300"
                   v-model="inpainter"
                 >
-                  <!-- <option value="default">Default</option> -->
-                  <!-- <option value="lama_large">Lama Large</option> -->
                   <option value="lama_mpe">Lama MPE</option>
-                  <!-- <option value="sd">SD</option> -->
-                  <!-- <option value="none">None</option> -->
-                  <!-- <option value="original">Original</option> -->
                 </select>
                 <i
                   class="iconify absolute top-1.5 right-1 pointer-events-none"
@@ -511,9 +506,7 @@
         renderTextDirection: "horizontal",
         translator: "gemini-2.0-flash-exp",
         validTranslators: [
-          // "gemini-2.0-pro-exp-02-05",
           "gemini-2.0-flash-exp",
-          // "gemini-2.0-flash-thinking-exp-01-21",
         ],
         getTranslatorName(key) {
           if (key === "none") return "No Text";
