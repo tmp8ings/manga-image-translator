@@ -68,10 +68,10 @@ def split_text_region(
             or distances_sorted[0] <= fontsize * (1 + gamma)) \
             and (distances_std < std_threshold \
             or (max_poly_distance == 0 and max_centroid_alignment < 5)):
-        logger.debug(f"split_text_region({bbox_tests}): Merging connected region indices as top edge weight {distances_sorted[0]:.2f} meets thresholds (mean {distances_mean:.2f}, std {distances_std:.2f}, fontsize {fontsize:.2f}).")
+        logger.debug(f"split_text_region({bbox_texts}): Merging connected region indices as top edge weight {distances_sorted[0]:.2f} meets thresholds (mean {distances_mean:.2f}, std {distances_std:.2f}, fontsize {fontsize:.2f}).")
         return [set(connected_region_indices)]
     else:
-        logger.debug(f"split_text_region({bbox_tests}): Splitting text region as top edge weight {distances_sorted[0]:.2f} exceeds thresholds (mean {distances_mean:.2f}, std {distances_std:.2f}, std_threshold {std_threshold:.2f}, max_poly_distance {max_poly_distance:.2f}, max_centroid_alignment {max_centroid_alignment:.2f}).")
+        logger.debug(f"split_text_region({bbox_texts}): Splitting text region as top edge weight {distances_sorted[0]:.2f} exceeds thresholds (mean {distances_mean:.2f}, std {distances_std:.2f}, std_threshold {std_threshold:.2f}, max_poly_distance {max_poly_distance:.2f}, max_centroid_alignment {max_centroid_alignment:.2f}).")
         G = nx.Graph()
         for idx in connected_region_indices:
             G.add_node(idx)
