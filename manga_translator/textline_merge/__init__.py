@@ -42,7 +42,7 @@ def split_text_region(
             logger.debug(f"split_text_region({bbox_texts}): Merging two bboxes as distance {distance:.2f} < {(1+gamma)*fs:.2f} and angle difference {angle_diff:.2f} < {0.2*np.pi:.2f}.")
             return [set(connected_region_indices)]
         else:
-            logger.debug(f"split_text_region({bbox_texts}): Not merging two bboxes as distance {distance:.2f} and angle difference {angle_diff:.2f} exceed thresholds({distance < (1 + gamma) * fs}). Splitting them.")
+            logger.debug(f"split_text_region({bbox_texts}): Not merging two bboxes as distance {distance:.2f} and angle difference {angle_diff:.2f} exceed thresholds({(1 + gamma) * fs}). Splitting them.")
             return [set([connected_region_indices[0]]), set([connected_region_indices[1]])]
 
     # case 3
@@ -99,7 +99,7 @@ def merge_bboxes_text_region(bboxes: List[Quadrilateral], width, height):
     # step 2: postprocess - further split each region
     region_indices: List[Set[int]] = []
     for node_set in nx.algorithms.components.connected_components(G):
-         region_indices.extend(split_text_region(bboxes, node_set, width, height))
+         region_indices.extend(split_text_region(bboxes, node_set, width, height, gamma=1))
 
     # step 3: return regions
     for node_set in region_indices:
