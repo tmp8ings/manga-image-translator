@@ -312,6 +312,27 @@
                 />
               </div>
             </div>
+            <div class="flex items-center" title="글자 제거에 사용할 모델을 선택합니다.">
+              <i class="iconify" data-icon="carbon:paint-bucket"></i>
+              <span class="ml-1 mr-2 text-sm">Inpainter</span>
+              <div class="relative">
+                <select
+                  class="w-auto pr-8 appearance-none bg-transparent border-b border-gray-300"
+                  v-model="inpainter"
+                >
+                  <option value="default">Default</option>
+                  <option value="lama_large">Lama Large</option>
+                  <option value="lama_mpe">Lama MPE</option>
+                  <option value="sd">SD</option>
+                  <option value="none">None</option>
+                  <option value="original">Original</option>
+                </select>
+                <i
+                  class="iconify absolute top-1.5 right-1 pointer-events-none"
+                  data-icon="carbon:chevron-down"
+                ></i>
+              </div>
+            </div>
           </div>
           <div
             class="flex flex-wrap mx-4 justify-start items-center gap-4 mt-4"
@@ -506,7 +527,7 @@
         // Added new textThreshold data property
         textThreshold: 0.5,
         maskDilationOffset: 30,
-        inpainter: "default",
+        inpainter: "lama_mpe",
 
         // New helper method to check ZIP file type
         isZip(file) {
