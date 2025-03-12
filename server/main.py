@@ -17,6 +17,7 @@ from concurrent.futures import ThreadPoolExecutor
 import asyncio  # for running async functions synchronously in the thread
 import time  # add at the top if not present
 from starlette.background import BackgroundTask  # added import
+import requests  # Added import for polling the share server
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
@@ -345,7 +346,9 @@ def prepare(args):
     else:
         nonce = args.nonce
     if args.start_instance:
-        return start_translator_client_proc(args.host, args.port + 1, nonce, args)
+        host = args.host
+        port = args.port + 1
+        return start_translator_client_proc(host, port, nonce, args), host, port
     folder_name = "upload-cache"
     if os.path.exists(folder_name):
         shutil.rmtree(folder_name)
@@ -497,7 +500,19 @@ if __name__ == "__main__":
     try:
         # Set Uvicorn log level and extend keep-alive timeout for large zip responses
         log_level = "debug" if args.verbose else "info"
-        proc = prepare(args)
+        proc, host, port = prepare(args)
+        
+        # Wait until the translator (share.py) server is fully available
+        health_url = f"http://{host}:{port}/health"
+        while True:
+            try:
+                response = requests.get(health_url, timeout=1)
+                if response.status_code == 200:
+                    break
+            except requests.exceptions.RequestException:
+                pass
+            time.sleep(1)
+
         print("Nonce: " + nonce)
         uvicorn.run(
             app,
@@ -506,7 +521,6 @@ if __name__ == "__main__":
             log_level=log_level,
             timeout_keep_alive=36000,  # increased timeout to handle long processing times
         )
-
     except Exception as e:
         logger.critical(f"Server crashed: {str(e)}")
         logger.critical(traceback.format_exc())

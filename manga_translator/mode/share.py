@@ -107,6 +107,10 @@ class MangaShare:
 
     async def listen(self, translation_params: dict = None):
         app = FastAPI()
+        
+        @app.get("/health")
+        async def health_check():
+            return {"status": "ok"}
 
         @app.get("/is_locked")
         async def is_locked():
