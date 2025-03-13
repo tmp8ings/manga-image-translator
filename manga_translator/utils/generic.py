@@ -934,43 +934,43 @@ def quadrilateral_can_merge_region(
     p2 = Polygon(b.pts)
     dist = p1.distance(p2)
     if dist > discard_connection_gap * char_size:
-        logger.debug(
-            f"quadrilateral_can_merge_region({a_text}, {b_text}): Return False - distance {dist} exceeds threshold {discard_connection_gap * char_size} (discard_connection_gap * char_size)"
-        )
+        # logger.debug(
+        #     f"quadrilateral_can_merge_region({a_text}, {b_text}): Return False - distance {dist} exceeds threshold {discard_connection_gap * char_size} (discard_connection_gap * char_size)"
+        # )
         return False
     if max(a.font_size, b.font_size) / char_size > font_size_ratio_tol:
-        logger.debug(
-            f"quadrilateral_can_merge_region({a_text}, {b_text}): Return False - font size ratio {max(a.font_size, b.font_size) / char_size} exceeds tolerance {font_size_ratio_tol}"
-        )
+        # logger.debug(
+        #     f"quadrilateral_can_merge_region({a_text}, {b_text}): Return False - font size ratio {max(a.font_size, b.font_size) / char_size} exceeds tolerance {font_size_ratio_tol}"
+        # )
         return False
     if a.aspect_ratio > aspect_ratio_tol and b.aspect_ratio < 1.0 / aspect_ratio_tol:
-        logger.debug(
-            f"quadrilateral_can_merge_region({a_text}, {b_text}): Return False - a.aspect_ratio {a.aspect_ratio} > {aspect_ratio_tol} and b.aspect_ratio {b.aspect_ratio} < {1.0 / aspect_ratio_tol}"
-        )
+        # logger.debug(
+        #     f"quadrilateral_can_merge_region({a_text}, {b_text}): Return False - a.aspect_ratio {a.aspect_ratio} > {aspect_ratio_tol} and b.aspect_ratio {b.aspect_ratio} < {1.0 / aspect_ratio_tol}"
+        # )
         return False
     if b.aspect_ratio > aspect_ratio_tol and a.aspect_ratio < 1.0 / aspect_ratio_tol:
-        logger.debug(
-            f"quadrilateral_can_merge_region({a_text}, {b_text}): Return False - b.aspect_ratio {b.aspect_ratio} > {aspect_ratio_tol} and a.aspect_ratio {a.aspect_ratio} < {1.0 / aspect_ratio_tol}"
-        )
+        # logger.debug(
+        #     f"quadrilateral_can_merge_region({a_text}, {b_text}): Return False - b.aspect_ratio {b.aspect_ratio} > {aspect_ratio_tol} and a.aspect_ratio {a.aspect_ratio} < {1.0 / aspect_ratio_tol}"
+        # )
         return False
     a_aa = a.is_approximate_axis_aligned
     b_aa = b.is_approximate_axis_aligned
     if a_aa and b_aa:
         if dist < char_size * char_gap_tolerance:
             if abs(x1 + w1 // 2 - (x2 + w2 // 2)) < char_gap_tolerance2:
-                logger.debug(
-                    f"quadrilateral_can_merge_region({a_text}, {b_text}): Return True - approx aligned with center proximity met"
-                )
+                # logger.debug(
+                #     f"quadrilateral_can_merge_region({a_text}, {b_text}): Return True - approx aligned with center proximity met"
+                # )
                 return True
             if w1 > h1 * ratio and h2 > w2 * ratio:
-                logger.debug(
-                    f"quadrilateral_can_merge_region({a_text}, {b_text}): Return False - incompatible horizontal dimensions detected"
-                )
+                # logger.debug(
+                #     f"quadrilateral_can_merge_region({a_text}, {b_text}): Return False - incompatible horizontal dimensions detected"
+                # )
                 return False
             if w2 > h2 * ratio and h1 > w1 * ratio:
-                logger.debug(
-                    f"quadrilateral_can_merge_region({a_text}, {b_text}): Return False - incompatible horizontal dimensions detected (case 2)"
-                )
+                # logger.debug(
+                #     f"quadrilateral_can_merge_region({a_text}, {b_text}): Return False - incompatible horizontal dimensions detected (case 2)"
+                # )
                 return False
             if w1 > h1 * ratio or w2 > h2 * ratio:
                 condition = (
