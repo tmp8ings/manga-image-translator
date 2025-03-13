@@ -219,19 +219,31 @@ async def bytes_form(
 
 @app.post(
     "/translate/with-form/image",
-    response_description="the result image",
+    response_description="the result image with logging",
     tags=["api", "form"],
     response_class=StreamingResponse,
 )
-async def image_form(
-    req: Request, image: UploadFile = File(...), config: str = Form("{}")
-) -> StreamingResponse:
+async def image_form(req: Request, image: UploadFile = File(...), config: str = Form("{}")) -> StreamingResponse:
     img = await image.read()
+    # Create logging folder based on current time
+    folder = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+    folder = os.path.join("logging", folder)
+    os.makedirs(folder, exist_ok=True)
+    # Save input image using original filename
+    input_path = os.path.join(folder, image.filename)
+    with open(input_path, "wb") as f:
+        f.write(img)
+    # Process translation
     ctx = await get_ctx(req, Config.parse_raw(config), img)
-    img_byte_arr = io.BytesIO()
-    ctx.result.save(img_byte_arr, format="PNG")
+    # Obtain output image bytes and save to logging folder
+    out_bytes = transform_to_image(ctx)
+    output_filename = "translated_" + image.filename
+    output_path = os.path.join(folder, output_filename)
+    with open(output_path, "wb") as f:
+        f.write(out_bytes)
+    # Return the processed image
+    img_byte_arr = io.BytesIO(out_bytes)
     img_byte_arr.seek(0)
-
     return StreamingResponse(img_byte_arr, media_type="image/png")
 
 
