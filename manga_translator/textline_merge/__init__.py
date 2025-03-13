@@ -28,7 +28,7 @@ def split_text_region(
 
     # case 1
     if len(connected_region_indices) == 1:
-        logger.debug(f"split_text_region({bbox_texts}): Only one index ({connected_region_indices[0]}). Returning merged region.")
+        # logger.debug(f"split_text_region({bbox_texts}): Only one index ({connected_region_indices[0]}). Returning merged region.")
         return [set(connected_region_indices)]
 
     # case 2
@@ -39,10 +39,10 @@ def split_text_region(
         distance = bboxes[connected_region_indices[0]].distance(bboxes[connected_region_indices[1]])
         angle_diff = abs(bboxes[connected_region_indices[0]].angle - bboxes[connected_region_indices[1]].angle)
         if distance < (1 + gamma) * fs and angle_diff < 0.2 * np.pi:
-            logger.debug(f"split_text_region({bbox_texts}): Merging two bboxes as distance {distance:.2f} < {(1+gamma)*fs:.2f} and angle difference {angle_diff:.2f} < {0.2*np.pi:.2f}.")
+            # logger.debug(f"split_text_region({bbox_texts}): Merging two bboxes as distance {distance:.2f} < {(1+gamma)*fs:.2f} and angle difference {angle_diff:.2f} < {0.2*np.pi:.2f}.")
             return [set(connected_region_indices)]
         else:
-            logger.debug(f"split_text_region({bbox_texts}): Not merging two bboxes as distance {distance:.2f} and angle difference {angle_diff:.2f} exceed thresholds({(1 + gamma) * fs}). Splitting them.")
+            # logger.debug(f"split_text_region({bbox_texts}): Not merging two bboxes as distance {distance:.2f} and angle difference {angle_diff:.2f} exceed thresholds({(1 + gamma) * fs}). Splitting them.")
             return [set([connected_region_indices[0]]), set([connected_region_indices[1]])]
 
     # case 3
@@ -68,10 +68,10 @@ def split_text_region(
             or distances_sorted[0] <= fontsize * (1 + gamma)) \
             and (distances_std < std_threshold \
             or (max_poly_distance == 0 and max_centroid_alignment < 5)):
-        logger.debug(f"split_text_region({bbox_texts}): Merging connected region indices as top edge weight {distances_sorted[0]:.2f} meets thresholds (mean {distances_mean:.2f}, std {distances_std:.2f}, fontsize {fontsize:.2f}).")
+        # logger.debug(f"split_text_region({bbox_texts}): Merging connected region indices as top edge weight {distances_sorted[0]:.2f} meets thresholds (mean {distances_mean:.2f}, std {distances_std:.2f}, fontsize {fontsize:.2f}).")
         return [set(connected_region_indices)]
     else:
-        logger.debug(f"split_text_region({bbox_texts}): Splitting text region as top edge weight {distances_sorted[0]:.2f} exceeds thresholds (mean {distances_mean:.2f}, std {distances_std:.2f}, std_threshold {std_threshold:.2f}, max_poly_distance {max_poly_distance:.2f}, max_centroid_alignment {max_centroid_alignment:.2f}).")
+        # logger.debug(f"split_text_region({bbox_texts}): Splitting text region as top edge weight {distances_sorted[0]:.2f} exceeds thresholds (mean {distances_mean:.2f}, std {distances_std:.2f}, std_threshold {std_threshold:.2f}, max_poly_distance {max_poly_distance:.2f}, max_centroid_alignment {max_centroid_alignment:.2f}).")
         G = nx.Graph()
         for idx in connected_region_indices:
             G.add_node(idx)
