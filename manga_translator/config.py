@@ -154,7 +154,7 @@ class Upscaler(str, Enum):
 class RenderConfig(BaseModel):
     renderer: Renderer = Renderer.default
     """Render english text translated from manga with some additional typesetting. Ignores some other argument options"""
-    alignment: Alignment = Alignment.left
+    alignment: Alignment = Alignment.auto
     """Align rendered text"""
     disable_font_border: bool = False
     """Disable font border"""
