@@ -17,14 +17,18 @@ def split_text_region(
         connected_region_indices: Set[int],
         width,
         height,
-        gamma = 0.5,
-        sigma = 2
+        gamma=0.5,
+        sigma=2
     ) -> List[Set[int]]:
 
     connected_region_indices = list(connected_region_indices)
+    
+    bbox_texts = [bboxes[idx].text.strip() for idx in connected_region_indices]
+    bbox_texts = [text[:5] for text in bbox_texts if text]
 
     # case 1
     if len(connected_region_indices) == 1:
+        logger.debug(f"split_text_region({bbox_texts}): Only one index ({connected_region_indices[0]}). Returning merged region.")
         return [set(connected_region_indices)]
 
     # case 2
@@ -32,15 +36,13 @@ def split_text_region(
         fs1 = bboxes[connected_region_indices[0]].font_size
         fs2 = bboxes[connected_region_indices[1]].font_size
         fs = max(fs1, fs2)
-
-        # print(bboxes[connected_region_indices[0]].pts, bboxes[connected_region_indices[1]].pts)
-        # print(fs, bboxes[connected_region_indices[0]].distance(bboxes[connected_region_indices[1]]), (1 + gamma) * fs)
-        # print(bboxes[connected_region_indices[0]].angle, bboxes[connected_region_indices[1]].angle, 4 * np.pi / 180)
-
-        if bboxes[connected_region_indices[0]].distance(bboxes[connected_region_indices[1]]) < (1 + gamma) * fs \
-                and abs(bboxes[connected_region_indices[0]].angle - bboxes[connected_region_indices[1]].angle) < 0.2 * np.pi:
+        distance = bboxes[connected_region_indices[0]].distance(bboxes[connected_region_indices[1]])
+        angle_diff = abs(bboxes[connected_region_indices[0]].angle - bboxes[connected_region_indices[1]].angle)
+        if distance < (1 + gamma) * fs and angle_diff < 0.2 * np.pi:
+            logger.debug(f"split_text_region({bbox_texts}): Merging two bboxes as distance {distance:.2f} < {(1+gamma)*fs:.2f} and angle difference {angle_diff:.2f} < {0.2*np.pi:.2f}.")
             return [set(connected_region_indices)]
         else:
+            logger.debug(f"split_text_region({bbox_texts}): Not merging two bboxes as distance {distance:.2f} and angle difference {angle_diff:.2f} exceed thresholds({(1 + gamma) * fs}). Splitting them.")
             return [set([connected_region_indices[0]]), set([connected_region_indices[1]])]
 
     # case 3
@@ -62,20 +64,14 @@ def split_text_region(
     max_poly_distance = Polygon(b1.pts).distance(Polygon(b2.pts))
     max_centroid_alignment = min(abs(b1.centroid[0] - b2.centroid[0]), abs(b1.centroid[1] - b2.centroid[1]))
 
-    # print(edges)
-    # print(f'std: {distances_std} < thrshold: {std_threshold}, mean: {distances_mean}')
-    # print(f'{distances_sorted[0]} <= {distances_mean + distances_std * sigma}' \
-    #         f' or {distances_sorted[0]} <= {fontsize * (1 + gamma)}' \
-    #         f' or {distances_sorted[0] - distances_sorted[1]} < {distances_std * sigma}')
-
     if (distances_sorted[0] <= distances_mean + distances_std * sigma \
             or distances_sorted[0] <= fontsize * (1 + gamma)) \
             and (distances_std < std_threshold \
-            or max_poly_distance == 0 and max_centroid_alignment < 5):
+            or (max_poly_distance == 0 and max_centroid_alignment < 5)):
+        logger.debug(f"split_text_region({bbox_texts}): Merging connected region indices as top edge weight {distances_sorted[0]:.2f} meets thresholds (mean {distances_mean:.2f}, std {distances_std:.2f}, fontsize {fontsize:.2f}).")
         return [set(connected_region_indices)]
     else:
-        # (split_u, split_v, _) = edges[0]
-        # print(f'split between "{bboxes[split_u].pts}", "{bboxes[split_v].pts}"')
+        logger.debug(f"split_text_region({bbox_texts}): Splitting text region as top edge weight {distances_sorted[0]:.2f} exceeds thresholds (mean {distances_mean:.2f}, std {distances_std:.2f}, std_threshold {std_threshold:.2f}, max_poly_distance {max_poly_distance:.2f}, max_centroid_alignment {max_centroid_alignment:.2f}).")
         G = nx.Graph()
         for idx in connected_region_indices:
             G.add_node(idx)
@@ -87,47 +83,7 @@ def split_text_region(
             ans.extend(split_text_region(bboxes, node_set, width, height))
         return ans
 
-# def get_mini_boxes(contour):
-#     bounding_box = cv2.minAreaRect(contour)
-#     points = sorted(list(cv2.boxPoints(bounding_box)), key=lambda x: x[0])
-
-#     index_1, index_2, index_3, index_4 = 0, 1, 2, 3
-#     if points[1][1] > points[0][1]:
-#         index_1 = 0
-#         index_4 = 1
-#     else:
-#         index_1 = 1
-#         index_4 = 0
-#     if points[3][1] > points[2][1]:
-#         index_2 = 2
-#         index_3 = 3
-#     else:
-#         index_2 = 3
-#         index_3 = 2
-
-#     box = [points[index_1], points[index_2], points[index_3], points[index_4]]
-#     box = np.array(box)
-#     startidx = box.sum(axis=1).argmin()
-#     box = np.roll(box, 4 - startidx, 0)
-#     box = np.array(box)
-#     return box
-
 def merge_bboxes_text_region(bboxes: List[Quadrilateral], width, height):
-    # step 0: merge quadrilaterals that belong to the same textline
-    # u = 0
-    # removed_counter = 0
-    # while u < len(bboxes) - 1 - removed_counter:
-    #     v = u
-    #     while v < len(bboxes) - removed_counter:
-    #         if quadrilateral_can_merge_region(bboxes[u], bboxes[v], aspect_ratio_tol=1.1, font_size_ratio_tol=1,
-    #                                         char_gap_tolerance=1, char_gap_tolerance2=3, discard_connection_gap=0) \
-    #            and abs(bboxes[u].centroid[0] - bboxes[v].centroid[0]) < 5 or abs(bboxes[u].centroid[1] - bboxes[v].centroid[1]) < 5:
-    #                 bboxes[u] = merge_quadrilaterals(bboxes[u], bboxes[v])
-    #                 removed_counter += 1
-    #                 bboxes.pop(v)
-    #         else:
-    #             v += 1
-    #     u += 1
 
     # step 1: divide into multiple text region candidates
     G = nx.Graph()
@@ -136,14 +92,14 @@ def merge_bboxes_text_region(bboxes: List[Quadrilateral], width, height):
 
     for ((u, ubox), (v, vbox)) in itertools.combinations(enumerate(bboxes), 2):
         # if quadrilateral_can_merge_region_coarse(ubox, vbox):
-        if quadrilateral_can_merge_region(ubox, vbox, aspect_ratio_tol=1.3, font_size_ratio_tol=2,
-                                          char_gap_tolerance=1, char_gap_tolerance2=3):
+        if quadrilateral_can_merge_region(ubox, vbox, aspect_ratio_tol=2, font_size_ratio_tol=2,
+                                          char_gap_tolerance=2, char_gap_tolerance2=5, discard_connection_gap=2):
             G.add_edge(u, v)
 
     # step 2: postprocess - further split each region
     region_indices: List[Set[int]] = []
     for node_set in nx.algorithms.components.connected_components(G):
-         region_indices.extend(split_text_region(bboxes, node_set, width, height))
+         region_indices.extend(split_text_region(bboxes, node_set, width, height, gamma=1))
 
     # step 3: return regions
     for node_set in region_indices:
@@ -187,12 +143,7 @@ def merge_bboxes_text_region(bboxes: List[Quadrilateral], width, height):
         yield txtlns, (fg_r, fg_g, fg_b), (bg_r, bg_g, bg_b)
 
 async def dispatch(textlines: List[Quadrilateral], width: int, height: int, verbose: bool = False) -> List[TextBlock]:
-    # print(width, height)
-    # import re
-    # for l in textlines:
-    #     s = str(l.pts)
-    #     s = re.sub(r'([\d\]]) ', r'\1, ', s.replace('\n ', ', ')).replace(']]', ']],')
-    #     print(s)
+
 
     text_regions: List[TextBlock] = []
     for (txtlns, fg_color, bg_color) in merge_bboxes_text_region(textlines, width, height):

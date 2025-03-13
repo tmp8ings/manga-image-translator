@@ -117,11 +117,11 @@ async def polling_in_queue(task: QueueElement):
     while True:
         queue_pos = task_queue.get_pos(task)
         if queue_pos is None:
-            raise HTTPException(500, detail="User is no longer connected")
-        # Check if no polling has occurred in the last 30 seconds
-        if time.time() - getattr(task, "last_poll", 0) > 30:
+            raise HTTPException(500, detail=f"User is no longer connected - can't find task in queue")  # just for the logs
+        # Check if no polling has occurred in the last 180 seconds
+        if time.time() - getattr(task, "last_poll", 0) > 180:
             await task_queue.update_event()
-            raise HTTPException(500, detail="User is no longer connected")
+            raise HTTPException(500, detail="User is no longer connected - too old polling")
         if queue_pos < executor_instances.free_executors():
             instance = await executor_instances.find_executor()
             await task_queue.remove(task)

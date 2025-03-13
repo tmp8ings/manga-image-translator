@@ -55,7 +55,7 @@ fastapi
 pydantic
 python-multipart
 paddleocr
-paddlepaddle; sys_platform == 'darwin'
+paddlepaddle
 paddlepaddle-gpu; sys_platform != 'darwin'
 google-generativeai
 httpx

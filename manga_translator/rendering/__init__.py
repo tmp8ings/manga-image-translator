@@ -131,7 +131,10 @@ def is_in_speech_balloon(region: TextBlock, img: np.ndarray) -> bool:
 def is_expand_needed(region: TextBlock, img: np.ndarray) -> bool:
     # log every elements that can effect the decision
     # logger.debug(f"region {region.translation[:3]}({len(region.translation[:3])}): font size: {region.font_size}, unrotated_size: {region.unrotated_size}")
-    
+
+    # Do not expand if region is not changed from vertical to horizontal.
+    if not region.is_changed_from_vertical_to_horizontal:
+        return False
     # Do not expand if region is vertical.
     if region.vertical:
         # logger.debug(f"region {region.translation[:3]} is vertical")
@@ -149,7 +152,7 @@ def is_expand_needed(region: TextBlock, img: np.ndarray) -> bool:
     if is_in_speech_balloon(region, img):
         # logger.debug(f"region {region.translation[:3]} is in a speech balloon")
         return False
-    
+
     # 텍스트 박스의 모양이 세로로 긴 형태일 때 True 리턴
     if region.unrotated_size[1] > region.unrotated_size[0] * 2:
         # logger.debug(f"region {region.translation[:3]} is long")
@@ -159,15 +162,12 @@ def is_expand_needed(region: TextBlock, img: np.ndarray) -> bool:
 
 
 def expand_text_boxes(
-    regions: List[TextBlock], expand_box_width_ratio: float, img: np.ndarray
+    all_regions: List[TextBlock],
+    expand_box_width_ratio: float,
+    img: np.ndarray,
 ):
-    """
-    Expand text boxes that need expansion (as per is_expand_needed) by scaling their width (for horizontal text)
-    or height (for vertical text) by expand_box_width_ratio. Adjust positions to avoid overlapping and ensure
-    boxes remain within the image boundaries.
-    """
-    if expand_box_width_ratio <= 0 or math.isclose(expand_box_width_ratio, 1.0):
-        return regions  # No change needed
+    if expand_box_width_ratio < 1 or math.isclose(expand_box_width_ratio, 1.0):
+        return all_regions  # No change needed
 
     def boxes_overlap(box1, box2):
         x1, y1, x2, y2 = box1
@@ -177,55 +177,49 @@ def expand_text_boxes(
     expanded_regions = []
     placed_boxes = []  # Store already placed (x1, y1, x2, y2) boxes
 
-    for region in regions:
+    for region in all_regions:
         bbox = region.xyxy  # [x1, y1, x2, y2]
         if not is_expand_needed(region, img):
             placed_boxes.append(tuple(bbox.tolist()))
             expanded_regions.append(region)
             continue
 
+        # Process expansion for regions that need expansion.
         x1, y1, x2, y2 = bbox
         width = x2 - x1
         height = y2 - y1
 
-        if region.horizontal:
-            new_width = int(width * expand_box_width_ratio)
-            new_height = height
-            center_x = (x1 + x2) // 2
-            new_x1 = center_x - new_width // 2
-            new_x2 = center_x + new_width // 2
-            new_y1, new_y2 = y1, y2
-        else:
-            new_height = int(height * expand_box_width_ratio)
-            new_width = width
-            center_y = (y1 + y2) // 2
-            new_y1 = center_y - new_height // 2
-            new_y2 = center_y + new_height // 2
-            new_x1, new_x2 = x1, x2
+        shirink_height_ratio = (expand_box_width_ratio - 1) / 2 + 1
+        new_width = int(width * expand_box_width_ratio)
+        new_height = height / shirink_height_ratio
+        center_x = (x1 + x2) // 2
+        new_x1 = center_x - new_width // 2
+        new_x2 = center_x + new_width // 2
+        new_y1, new_y2 = y1, y2
 
-        # Clip within image boundaries
+        # Clip within image boundaries.
         new_x1 = max(0, new_x1)
         new_y1 = max(0, new_y1)
         new_x2 = min(img.shape[1], new_x2)
         new_y2 = min(img.shape[0], new_y2)
         proposed_box = (new_x1, new_y1, new_x2, new_y2)
 
-        # If overlapping with any already placed box, shift (right for horizontal, down for vertical)
-        shift = 0
-        max_shift = 100
-        while (
-            any(boxes_overlap(proposed_box, placed) for placed in placed_boxes)
-            and shift < max_shift
-        ):
-            shift += 5
+        # Reposition using overlapping box info until no overlap exists.
+        while any(boxes_overlap(proposed_box, placed) for placed in placed_boxes):
             if region.horizontal:
-                new_x1_shift = min(new_x1 + shift, img.shape[1] - new_width)
-                new_x2_shift = new_x1_shift + new_width
-                proposed_box = (new_x1_shift, new_y1, new_x2_shift, new_y2)
+                overlapping_boxes = [b for b in placed_boxes if boxes_overlap(proposed_box, b)]
+                new_x1 = max(b[2] for b in overlapping_boxes) + 5
+                new_x2 = new_x1 + new_width
+                new_x1 = max(0, new_x1)
+                new_x2 = min(img.shape[1], new_x2)
+                proposed_box = (new_x1, new_y1, new_x2, new_y2)
             else:
-                new_y1_shift = min(new_y1 + shift, img.shape[0] - new_height)
-                new_y2_shift = new_y1_shift + new_height
-                proposed_box = (new_x1, new_y1_shift, new_x2, new_y2_shift)
+                overlapping_boxes = [b for b in placed_boxes if boxes_overlap(proposed_box, b)]
+                new_y1 = max(b[3] for b in overlapping_boxes) + 5
+                new_y2 = new_y1 + new_height
+                new_y1 = max(0, new_y1)
+                new_y2 = min(img.shape[0], new_y2)
+                proposed_box = (new_x1, new_y1, new_x2, new_y2)
 
         placed_boxes.append(proposed_box)
         # Update region.lines with the new rectangular coordinates
@@ -260,7 +254,7 @@ async def dispatch(
 
     text_render.set_font(font_path)
     text_regions = list(filter(lambda region: region.translation.strip(), text_regions))
-    
+
     # logger.debug(f"before expand: {text_regions}")
     text_regions = expand_text_boxes(
         text_regions, config.render.expand_box_width_ratio, img

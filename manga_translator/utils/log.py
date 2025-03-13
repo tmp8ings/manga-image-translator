@@ -30,13 +30,13 @@ root = logging.getLogger(ROOT_TAG)
 
 def init_logging():
     logging.basicConfig(level=logging.INFO)
-    logging.basicConfig(level=logging.WARN) # TODO: 레벨 변경
+    # logging.basicConfig(level=logging.WARN) # TODO: 레벨 변경
     for h in logging.root.handlers:
         h.setFormatter(Formatter())
         h.addFilter(Filter())
 
 def set_log_level(level):
-    logging.basicConfig(level=logging.WARN) # TODO: 레벨 변경
+    # logging.basicConfig(level=logging.WARN) # TODO: 레벨 변경
     root.setLevel(level)
 
 def get_logger(name: str):

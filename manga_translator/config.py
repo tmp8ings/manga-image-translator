@@ -87,6 +87,7 @@ class Detector(str, Enum):
     craft = "craft"
     paddle = "paddle"
     none = "none"
+    cotrans = "cotrans"
 
 class Inpainter(str, Enum):
     default = "default"
@@ -118,7 +119,7 @@ class Translator(str, Enum):
     sakura = "sakura"
     deepseek = "deepseek"
     groq = "groq"
-    ollama = "ollama"
+    custom_openai = "custom_openai"
     offline = "offline"
     nllb = "nllb"
     nllb_big = "nllb_big"
@@ -301,7 +302,7 @@ class ColorizerConfig(BaseModel):
 class OcrConfig(BaseModel):
     use_mocr_merge: bool = False
     """Use bbox merge when Manga OCR inference."""
-    ocr: Ocr = Ocr.ocr48px
+    ocr: Ocr = Ocr.mocr
     """Optical character recognition (OCR) model to use"""
     min_text_length: int = 0
     """Minimum text length of a text region"""
