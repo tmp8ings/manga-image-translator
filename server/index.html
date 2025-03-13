@@ -30,51 +30,7 @@
       <div class="flex flex-col w-85ch h-full justify-center gap-2">
         <!-- Basic Settings -->
         <div class="flex flex-wrap mx-4 justify-start items-end gap-4 mb-4">
-          <div
-            class="flex items-center"
-            title="감지에 사용할 이미지 해상도를 설정합니다."
-          >
-            <i class="iconify" data-icon="carbon:fit-to-screen"></i>
-            <span class="ml-1 mr-2 text-sm">Detection</span>
-            <div class="relative">
-              <select
-                class="w-auto pr-8 appearance-none bg-transparent border-b border-gray-300"
-                v-model="detectionResolution"
-              >
-                <option value="1024">1024px</option>
-                <option value="1536">1536px</option>
-                <option value="2048">2048px</option>
-                <option value="2560">2560px</option>
-                <option value="4096">4096px</option>
-              </select>
-              <i
-                class="iconify absolute top-1.5 right-1 pointer-events-none"
-                data-icon="carbon:chevron-down"
-              ></i>
-            </div>
-          </div>
-          <div
-            class="flex items-center"
-            title="문자를 감지할 모델을 선택합니다."
-          >
-            <i class="iconify" data-icon="carbon:search-locate"></i>
-            <span class="ml-1 mr-2 text-sm">Detector</span>
-            <div class="relative">
-              <select
-                class="w-auto pr-8 appearance-none bg-transparent border-b border-gray-300"
-                v-model="textDetector"
-              >
-                <option value="default">Default</option>
-                <option value="ctd">CTD</option>
-                <option value="paddle">Paddle</option>
-                <option value="cotrans">cotrans</option>
-              </select>
-              <i
-                class="iconify absolute top-1.5 right-1 pointer-events-none"
-                data-icon="carbon:chevron-down"
-              ></i>
-            </div>
-          </div>
+          <!-- Removed Detection, Detector, Language, OCR fields -->
           <div
             class="flex items-center"
             title="감지된 텍스트의 배열 방향을 설정합니다."
@@ -117,66 +73,6 @@
               ></i>
             </div>
           </div>
-          <div
-            class="flex items-center"
-            title="어떤 언어로 번역할지 선택합니다."
-          >
-            <i class="iconify" data-icon="carbon:language"></i>
-            <span class="ml-1 mr-2 text-sm">Language</span>
-            <div class="relative">
-              <select
-                class="w-auto pr-8 appearance-none bg-transparent border-b border-gray-300"
-                v-model="targetLanguage"
-              >
-                <option value="CHS">简体中文</option>
-                <option value="CHT">繁體中文</option>
-                <option value="JPN">日本語</option>
-                <option value="ENG">English</option>
-                <option value="KOR">한국어</option>
-                <option value="VIN">Tiếng Việt</option>
-                <option value="CSY">čeština</option>
-                <option value="NLD">Nederlands</option>
-                <option value="FRA">français</option>
-                <option value="DEU">Deutsch</option>
-                <option value="HUN">magyar nyelv</option>
-                <option value="ITA">italiano</option>
-                <option value="PLK">polski</option>
-                <option value="PTB">português</option>
-                <option value="ROM">limba română</option>
-                <option value="RUS">русский язык</option>
-                <option value="ESP">español</option>
-                <option value="TRK">Türk dili</option>
-                <option value="IND">Indonesia</option>
-              </select>
-              <i
-                class="iconify absolute top-1.5 right-1 pointer-events-none"
-                data-icon="carbon:chevron-down"
-              ></i>
-            </div>
-          </div>
-          <!-- Moved OCR Model into basic settings -->
-          <div
-            class="flex items-center"
-            title="텍스트 인식에 사용할 OCR 모델을 선택합니다."
-          >
-            <i class="iconify" data-icon="carbon:text-recognition"></i>
-            <span class="ml-1 mr-2 text-sm">OCR</span>
-            <div class="relative">
-              <select
-                class="w-auto pr-8 appearance-none bg-transparent border-b border-gray-300"
-                v-model="ocrModel"
-              >
-                <option value="32px">32px</option>
-                <option value="48px">48px</option>
-                <option value="48px_ctc">48px_ctc</option>
-                <option value="mocr">MOCR</option>
-              </select>
-              <i
-                class="iconify absolute top-1.5 right-1 pointer-events-none"
-                data-icon="carbon:chevron-down"
-              ></i>
-            </div>
-          </div>
           <!-- New basic setting for expand_box_width_ratio -->
           <div
             class="flex items-center"
@@ -190,7 +86,7 @@
                 step="0.1"
                 class="w-9ch appearance-none bg-transparent border-b border-gray-300"
                 v-model="expandBoxWidthRatio"
-                placeholder="2.0"
+                placeholder="1.0"
               />
             </div>
           </div>
@@ -210,6 +106,117 @@
 
         <!-- Advanced Settings -->
         <div v-if="advancedVisible" class="mb-4">
+          <!-- New advanced section for moved fields -->
+          <div class="flex flex-wrap mx-4 justify-start items-end gap-4 mb-4">
+            <!-- Detection Size -->
+            <div
+              class="flex items-center"
+              title="감지에 사용할 이미지 해상도를 설정합니다."
+            >
+              <i class="iconify" data-icon="carbon:fit-to-screen"></i>
+              <span class="ml-1 mr-2 text-sm">Detection</span>
+              <div class="relative">
+                <select
+                  class="w-auto pr-8 appearance-none bg-transparent border-b border-gray-300"
+                  v-model="detectionResolution"
+                >
+                  <option value="1024">1024px</option>
+                  <option value="1536">1536px</option>
+                  <option value="2048">2048px</option>
+                  <option value="2560">2560px</option>
+                  <option value="4096">4096px</option>
+                </select>
+                <i
+                  class="iconify absolute top-1.5 right-1 pointer-events-none"
+                  data-icon="carbon:chevron-down"
+                ></i>
+              </div>
+            </div>
+            <!-- Detector -->
+            <div
+              class="flex items-center"
+              title="문자를 감지할 모델을 선택합니다."
+            >
+              <i class="iconify" data-icon="carbon:search-locate"></i>
+              <span class="ml-1 mr-2 text-sm">Detector</span>
+              <div class="relative">
+                <select
+                  class="w-auto pr-8 appearance-none bg-transparent border-b border-gray-300"
+                  v-model="textDetector"
+                >
+                  <option value="default">Default</option>
+                  <option value="ctd">CTD</option>
+                  <option value="paddle">Paddle</option>
+                  <option value="cotrans">cotrans</option>
+                </select>
+                <i
+                  class="iconify absolute top-1.5 right-1 pointer-events-none"
+                  data-icon="carbon:chevron-down"
+                ></i>
+              </div>
+            </div>
+            <!-- Language -->
+            <div
+              class="flex items-center"
+              title="어떤 언어로 번역할지 선택합니다."
+            >
+              <i class="iconify" data-icon="carbon:language"></i>
+              <span class="ml-1 mr-2 text-sm">Language</span>
+              <div class="relative">
+                <select
+                  class="w-auto pr-8 appearance-none bg-transparent border-b border-gray-300"
+                  v-model="targetLanguage"
+                >
+                  <option value="CHS">简体中文</option>
+                  <option value="CHT">繁體中文</option>
+                  <option value="JPN">日本語</option>
+                  <option value="ENG">English</option>
+                  <option value="KOR">한국어</option>
+                  <option value="VIN">Tiếng Việt</option>
+                  <option value="CSY">čeština</option>
+                  <option value="NLD">Nederlands</option>
+                  <option value="FRA">français</option>
+                  <option value="DEU">Deutsch</option>
+                  <option value="HUN">magyar nyelv</option>
+                  <option value="ITA">italiano</option>
+                  <option value="PLK">polski</option>
+                  <option value="PTB">português</option>
+                  <option value="ROM">limba română</option>
+                  <option value="RUS">русский язык</option>
+                  <option value="ESP">español</option>
+                  <option value="TRK">Türk dili</option>
+                  <option value="IND">Indonesia</option>
+                </select>
+                <i
+                  class="iconify absolute top-1.5 right-1 pointer-events-none"
+                  data-icon="carbon:chevron-down"
+                ></i>
+              </div>
+            </div>
+            <!-- OCR -->
+            <div
+              class="flex items-center"
+              title="텍스트 인식에 사용할 OCR 모델을 선택합니다."
+            >
+              <i class="iconify" data-icon="carbon:text-recognition"></i>
+              <span class="ml-1 mr-2 text-sm">OCR</span>
+              <div class="relative">
+                <select
+                  class="w-auto pr-8 appearance-none bg-transparent border-b border-gray-300"
+                  v-model="ocrModel"
+                >
+                  <option value="32px">32px</option>
+                  <option value="48px">48px</option>
+                  <option value="48px_ctc">48px_ctc</option>
+                  <option value="mocr">MOCR</option>
+                </select>
+                <i
+                  class="iconify absolute top-1.5 right-1 pointer-events-none"
+                  data-icon="carbon:chevron-down"
+                ></i>
+              </div>
+            </div>
+          </div>
           <div class="flex flex-wrap mx-4 justify-start items-end gap-4 mb-4">
             <div
               class="flex items-center"
@@ -541,7 +548,7 @@
         advancedVisible: false,
 
         // New data properties:
-        expandBoxWidthRatio: 2.0,
+        expandBoxWidthRatio: 1.0,
         excludeOnomatopoeia: true,
 
         ondrop(e) {
