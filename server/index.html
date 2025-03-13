@@ -793,7 +793,7 @@
         },
         async handleNonZipSubmit(formData, buffer) {
           const response = await fetch(
-            `${BASE_URI}translate/with-form/image/stream`,
+            `${BASE_URI}translate/with-form/image`,  // changed from /translate/with-form/image/stream
             {
               method: "POST",
               body: formData,
@@ -803,50 +803,10 @@
             this.status = "error-upload";
             return;
           }
-          const reader = response.body.getReader();
-          const processChunk = (value) => {
-            if (this.error) return;
-            const newBuffer = new Uint8Array(buffer.length + value.length);
-            newBuffer.set(buffer);
-            newBuffer.set(value, buffer.length);
-            buffer = newBuffer;
-            while (buffer.length >= 5) {
-              const dataSize = new DataView(buffer.buffer).getUint32(1, false);
-              const totalSize = 5 + dataSize;
-              if (buffer.length < totalSize) break;
-              const statusCode = buffer[0];
-              const decoder = new TextDecoder("utf-8");
-              const data = buffer.slice(5, totalSize);
-              switch (statusCode) {
-                case 0:
-                  this.result = new Blob([data], { type: "image/png" });
-                  this.status = null;
-                  break;
-                case 1:
-                  this.status = decoder.decode(data);
-                  break;
-                case 2:
-                  this.status = "error";
-                  console.error(decoder.decode(data));
-                  break;
-                case 3:
-                  this.status = "pending";
-                  this.queuePos = decoder.decode(data);
-                  break;
-                case 4:
-                  this.status = "pending";
-                  this.queuePos = null;
-                  break;
-              }
-              buffer = buffer.slice(totalSize);
-            }
-          };
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            processChunk(value);
-            await sleep(1000);
-          }
+          // New response handling to obtain the complete image blob
+          const blob = await response.blob();
+          this.result = blob;
+          this.status = null;
         },
         clear() {
           this.file = null;
